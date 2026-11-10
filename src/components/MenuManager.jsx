@@ -15,7 +15,7 @@ function MenuManager() {
   useEffect(() => {
     let active = true
     async function loadDishes() {
-      const { data, error: queryError } = await supabase.from('dishes').select('*').order('name')
+      const { data, error: queryError } = await supabase.from('dishes').select('*').order('nombre')
       if (active) {
         if (queryError) setError('No se pudieron cargar los platos.')
         else setDishes(data || [])
@@ -24,7 +24,7 @@ function MenuManager() {
     }
     loadDishes()
     const channel = supabase.channel('admin-dishes').on('postgres_changes', { event: '*', schema: 'public', table: 'dishes' }, (payload) => {
-      if (payload.eventType === 'INSERT') setDishes((current) => [...current, payload.new].sort((a, b) => a.name.localeCompare(b.name)))
+      if (payload.eventType === 'INSERT') setDishes((current) => [...current, payload.new].sort((a, b) => a.nombre.localeCompare(b.nombre)))
       if (payload.eventType === 'UPDATE') setDishes((current) => current.map((dish) => dish.id === payload.new.id ? payload.new : dish))
       if (payload.eventType === 'DELETE') setDishes((current) => current.filter((dish) => dish.id !== payload.old.id))
     }).subscribe()
@@ -33,7 +33,7 @@ function MenuManager() {
 
   function editDish(dish) {
     setEditingId(dish.id)
-    setForm({ name: dish.name || '', description: dish.description || '', price: dish.price || '', imagen_url: dish.imagen_url || '', is_available: dish.is_available !== false })
+    setForm({ name: dish.nombre || '', description: dish.descripcion || '', price: dish.precio || '', imagen_url: dish.imagen_url || '', is_available: dish.is_available !== false })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -41,7 +41,7 @@ function MenuManager() {
     event.preventDefault()
     setSaving(true)
     setError('')
-    const payload = { ...form, price: Number(form.price), is_available: Boolean(form.is_available) }
+    const payload = { nombre: form.name, descripcion: form.description, precio: Number(form.price), imagen_url: form.imagen_url, is_available: Boolean(form.is_available) }
     const response = editingId
       ? await supabase.from('dishes').update(payload).eq('id', editingId).select().single()
       : await supabase.from('dishes').insert(payload).select().single()
@@ -73,7 +73,7 @@ function MenuManager() {
         </form>
       </section>
       <section className="panel dishes-panel"><div className="panel-heading"><div><h2>Platos del menú</h2><p className="muted">Administra disponibilidad y precios.</p></div><span className="dish-count">{dishes.length} platos</span></div>
-        {loading ? <div className="empty-state">Cargando menú...</div> : <div className="dish-table-wrap"><table className="dish-table"><thead><tr><th>Plato</th><th>Precio</th><th>Disponibilidad</th><th></th></tr></thead><tbody>{dishes.map((dish) => <tr key={dish.id}><td><div className="dish-cell">{dish.imagen_url ? <img src={dish.imagen_url} alt="" /> : <span className="dish-placeholder">◈</span>}<div><strong>{dish.name}</strong><small>{dish.description || 'Sin descripción'}</small></div></div></td><td>{money(dish.price)}</td><td><button className={`switch ${dish.is_available ? 'on' : ''}`} onClick={() => toggleAvailability(dish)} aria-label={`${dish.is_available ? 'Desactivar' : 'Activar'} ${dish.name}`}><span /></button><span className={dish.is_available ? 'available' : 'unavailable'}>{dish.is_available ? 'Disponible' : 'Agotado'}</span></td><td><button className="edit-button" onClick={() => editDish(dish)}>Editar</button></td></tr>)}</tbody></table>{!dishes.length && <div className="empty-state">Aún no hay platos en el menú.</div>}</div>}
+        {loading ? <div className="empty-state">Cargando menú...</div> : <div className="dish-table-wrap"><table className="dish-table"><thead><tr><th>Plato</th><th>Precio</th><th>Disponibilidad</th><th></th></tr></thead><tbody>{dishes.map((dish) => <tr key={dish.id}><td><div className="dish-cell">{dish.imagen_url ? <img src={dish.imagen_url} alt="" /> : <span className="dish-placeholder">◈</span>}<div><strong>{dish.nombre}</strong><small>{dish.descripcion || 'Sin descripción'}</small></div></div></td><td>{money(dish.precio)}</td><td><button className={`switch ${dish.is_available ? 'on' : ''}`} onClick={() => toggleAvailability(dish)} aria-label={`${dish.is_available ? 'Desactivar' : 'Activar'} ${dish.nombre}`}><span /></button><span className={dish.is_available ? 'available' : 'unavailable'}>{dish.is_available ? 'Disponible' : 'Agotado'}</span></td><td><button className="edit-button" onClick={() => editDish(dish)}>Editar</button></td></tr>)}</tbody></table>{!dishes.length && <div className="empty-state">Aún no hay platos en el menú.</div>}</div>}
       </section>
     </div>
   </>

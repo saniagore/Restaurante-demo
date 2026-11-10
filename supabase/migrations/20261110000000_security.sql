@@ -67,7 +67,7 @@ begin
   insert into public.orders(customer_name, order_type, notes, payment_method, total)
   values (
     left(trim(p_order->>'customer_name'), 100),
-    p_order->>'order_type',
+    (p_order->>'order_type')::public.order_type,
     nullif(left(trim(coalesce(p_order->>'notes', '')), 500), ''),
     'cash',
     calculated_total

@@ -1,0 +1,33 @@
+insert into public.dishes (id, nombre, descripcion, precio, imagen_url, is_available)
+values
+  ('00000000-0000-4000-8000-000000000001', 'Tri-Mini Monkeys', 'Tres mini burgers DMonkey para compartir y probar un poco de todo.', 39900, '/dmonkey-tri-mini-monkeys.png', true),
+  ('00000000-0000-4000-8000-000000000002', 'Monkshake Stacker', 'Cheeseburger sencilla o doble, papitas y tu thick-shake favorito.', 43700, '/dmonkey-monkshake-stacker.png', true),
+  ('00000000-0000-4000-8000-000000000003', 'Chees Maniatic', 'Combo para compartir con cheeseburgers, papas y bebidas bien frías.', 73900, '/dmonkey-combos.png', true),
+  ('00000000-0000-4000-8000-000000000004', 'Monk Box', 'Cheeseburger, gringo fries y un thick shake del sabor que elijas.', 59900, '/dmonkey-combos.png', true),
+  ('00000000-0000-4000-8000-000000000005', 'Cheddar Fries', 'Papas super crocantes por fuera y suaves por dentro, cubiertas con cheddar.', 14900, '/dmonkey-cheddar-fries.png', true),
+  ('00000000-0000-4000-8000-000000000006', 'Gringo Fries', 'Papas doradas al estilo americano con queso cheddar y tocineta crujiente.', 21900, '/dmonkey-gringo-fries.png', true),
+  ('00000000-0000-4000-8000-000000000007', 'Garlic-Gringo Fries', 'Papas doradas con cheddar, drip de ajo y tocineta jugosa.', 23900, '/dmonkey-garlic-gringo-fries.png', true),
+  ('00000000-0000-4000-8000-000000000008', 'Garlic / Cheddar Fries', 'Papas crujientes bañadas en cheddar derretido y emulsión cremosa de ajo.', 16500, '/dmonkey-garlic-cheddar-fries.png', true),
+  ('00000000-0000-4000-8000-000000000009', 'Bacon Jam!', 'Brioche artesanal, 180 g de angus beef, mermelada de bacon y vegetales frescos.', 27900, '/dmonkey-bacon-jam.png', true),
+  ('00000000-0000-4000-8000-000000000010', 'Cheeseburger', 'Angus beef, queso, tocineta premium, vegetales frescos y salsa de la casa.', 29500, '/dmonkey-cheeseburger.png', true),
+  ('00000000-0000-4000-8000-000000000011', 'Caribbean', 'Angus beef, piña caramelizada, queso artesanal y tocineta premium.', 27700, '/dmonkey-garibbean.png', true),
+  ('00000000-0000-4000-8000-000000000012', 'Sweet Relish', 'Angus beef, pepinillos crushed, tocineta premium y salsa de la casa.', 29900, '/dmonkey-sweet-relish.png', true),
+  ('00000000-0000-4000-8000-000000000013', 'Phili!', 'Angus beef, queso philadelphia, piña caramelizada, vegetales frescos y salsa de la casa.', 31500, '/dmonkey-phila.png', true),
+  ('00000000-0000-4000-8000-000000000014', 'Golden Velvet', 'Angus beef, doble crema apanada, parmesano, tocineta premium y vegetales frescos.', 32700, '/dmonkey-golden-velvet.png', true),
+  ('00000000-0000-4000-8000-000000000015', 'Big Cheese', 'Angus beef, queso americano, queso azul, mermelada de bacon y vegetales frescos.', 36600, '/dmonkey-big-cheese.png', true),
+  ('00000000-0000-4000-8000-000000000016', 'King Kong', '300 g de angus beef, doble queso, doble tocineta y vegetales frescos.', 39900, '/dmonkey-king-kong.png', true),
+  ('00000000-0000-4000-8000-000000000017', 'Chips & Cream', 'Shake de brownie, migas de Oreo y porción de papas a la francesa.', 21500, '/dmonkey-brownie-crushed.png', true),
+  ('00000000-0000-4000-8000-000000000018', 'Brownie Crushed', 'Shake de brownie, salsa Hershey’s, trozos de brownie y chantilly.', 24700, '/dmonkey-brownie-crushed.png', true),
+  ('00000000-0000-4000-8000-000000000019', 'Milo Blash', 'Shake mitad vainilla y mitad chocolate, brownie, nuggets, galleta y Milo.', 24700, '/dmonkey-milo-blast.png', true),
+  ('00000000-0000-4000-8000-000000000020', 'Oreo Hit', 'Shake de Oreo, salsa de Hershey’s, migas y trozos de galleta Oreo.', 24700, '/dmonkey-oreo-hit.png', true),
+  ('00000000-0000-4000-8000-000000000021', 'Baileys Babe', 'Thick shake de vainilla y Baileys, crema de avellanas y chips de chocolate.', 27500, '/dmonkey-baileys-babe.png', true),
+  ('00000000-0000-4000-8000-000000000022', 'Choco Monkshake', 'Shake de chocolate, crema chantilly y trozos de pizza de chocolate.', 19000, '/dmonkey-choco-monkshake.png', true),
+  ('00000000-0000-4000-8000-000000000023', 'Berry Monkshake', 'Shake de fresa, crema chantilly y trozos de pizza fresa.', 19000, '/dmonkey-berry-monkshake.png', true),
+  ('00000000-0000-4000-8000-000000000024', 'Cookie Monkshake', 'Shake de brownie, crema chantilly y migas de galleta Oreo.', 19000, '/dmonkey-cookie-monkshake.png', true),
+  ('00000000-0000-4000-8000-000000000025', 'Vanilla Monkshake', 'Shake de vainilla, crema chantilly y migas de Mini Chips.', 19000, '/dmonkey-vanilla-monkshake.png', true)
+on conflict (id) do update set
+  nombre = excluded.nombre,
+  descripcion = excluded.descripcion,
+  precio = excluded.precio,
+  imagen_url = excluded.imagen_url,
+  is_available = excluded.is_available;

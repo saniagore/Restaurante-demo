@@ -21,6 +21,8 @@ export interface CartState {
   total: () => number
 }
 
+const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+
 export const useCart = create<CartState>()(persist((set, get) => ({
   items: [],
   addItem: (dish) => set(({ items }) => {
@@ -39,5 +41,12 @@ export const useCart = create<CartState>()(persist((set, get) => ({
   })),
   clearCart: () => set({ items: [] }),
   total: () => get().items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-}), { name: 'restaurant-cart' }))
+}), {
+  name: 'restaurant-cart',
+  version: 1,
+  migrate: (state) => ({
+    ...state,
+    items: state.items.filter((item) => isUuid(item.id)),
+  }),
+}))
 

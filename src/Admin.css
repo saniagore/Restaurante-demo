@@ -14,10 +14,13 @@ input, textarea { width: 100%; padding: 12px 13px; color: var(--ink); background
 textarea { resize: vertical; }
 input:focus, textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 3px #e85d3220; }
 .form-error { color: #bd3f35; font-size: 12px; margin-top: -7px; }
+.password-toggle { justify-self: end; margin-top: -2px; padding: 0; color: var(--muted); background: transparent; border: 0; font-size: 10px; }
 .primary-button, .secondary-button { border: 0; border-radius: 8px; padding: 11px 15px; font-weight: 700; transition: transform .15s, opacity .15s; }
 .primary-button { background: var(--orange); color: #fff; }
 .primary-button:hover:not(:disabled) { transform: translateY(-1px); }
 .primary-button:disabled { opacity: .6; cursor: wait; }
+.secondary-button:hover:not(:disabled) { color: var(--orange); border-color: var(--orange); }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
 .secondary-button { color: #55545a; background: #fff; border: 1px solid var(--line); }
 .full-width { width: 100%; }
 .admin-shell { display: flex; min-height: 100vh; }
@@ -51,6 +54,7 @@ input:focus, textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 3px
 .order-list { display: grid; gap: 12px; padding-top: 14px; }
 .order-card, .panel { background: #fff; border: 1px solid var(--line); border-radius: 11px; }
 .order-card { padding: 15px; box-shadow: 0 3px 9px #302b2010; }
+.order-card:hover { border-color: #d7d4ce; box-shadow: 0 8px 18px #302b2018; transform: translateY(-1px); }
 .order-card-top, .order-total { display: flex; justify-content: space-between; align-items: center; }.order-card-top strong { font-size: 13px; }.order-card time { color: var(--muted); font-size: 10px; }
 .customer-name { margin: 5px 0 14px; font-size: 11px; color: #77767a; }
 .items-list { display: grid; gap: 8px; padding: 10px 0; border-top: 1px dashed #e2e0db; border-bottom: 1px dashed #e2e0db; }
@@ -64,3 +68,4 @@ input:focus, textarea:focus { border-color: var(--orange); box-shadow: 0 0 0 3px
 .form-row { display: grid; grid-template-columns: 1fr 1.5fr; gap: 12px; }.dish-table-wrap { overflow-x: auto; }.dish-table { width: 100%; border-collapse: collapse; font-size: 11px; }.dish-table th { padding: 0 10px 12px; color: #98969a; font-size: 10px; font-weight: 600; text-align: left; }.dish-table td { padding: 13px 10px; border-top: 1px solid #efedea; vertical-align: middle; }.dish-cell { display: flex; align-items: center; gap: 10px; min-width: 180px; }.dish-cell img, .dish-placeholder { width: 37px; height: 37px; flex: 0 0 auto; border-radius: 7px; object-fit: cover; }.dish-placeholder { display: grid; place-items: center; color: var(--orange); background: var(--orange-soft); font-size: 19px; }.dish-cell strong, .dish-cell small { display: block; }.dish-cell strong { font-size: 11px; }.dish-cell small { max-width: 170px; margin-top: 3px; overflow: hidden; color: #aaa8a4; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.available, .unavailable { margin-left: 7px; font-size: 10px; }.available { color: var(--green); }.unavailable { color: #b4b1ad; }.switch { width: 28px; height: 16px; padding: 2px; background: #d6d3cf; border: 0; border-radius: 10px; vertical-align: middle; }.switch span { display: block; width: 12px; height: 12px; background: #fff; border-radius: 50%; transition: transform .2s; }.switch.on { background: var(--green); }.switch.on span { transform: translateX(12px); }
 @media (max-width: 1050px) { .main-content { padding: 35px 25px; }.orders-board { grid-template-columns: repeat(2, 1fr); gap: 25px 16px; } }
 @media (max-width: 760px) { .sidebar { width: 64px; padding: 20px 8px; }.brand { padding: 0 5px; }.brand > div, .nav-item:not(.active)::after, .nav-item { font-size: 0; }.nav-item { justify-content: center; padding: 12px 5px; }.nav-item span { font-size: 17px; }.sidebar-footer .user-chip span:last-child, .logout-button { display: none; }.main-content { width: calc(100% - 64px); padding: 28px 14px; }.page-header { align-items: start; gap: 12px; }.page-header h1 { font-size: 25px; }.orders-board, .menu-layout { grid-template-columns: 1fr; }.order-column { min-width: 0; }.auth-card { padding: 30px 24px; } }
+@media (max-width: 520px) { .page-header { display: block; }.page-header .secondary-button { width: 100%; margin-top: 16px; }.orders-board { gap: 20px; }.main-content { padding: 24px 12px 40px; }.panel { padding: 17px; }.form-row { grid-template-columns: 1fr; } }
