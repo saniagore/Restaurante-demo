@@ -5,6 +5,9 @@ create table if not exists public.order_rate_limits (
   request_count integer not null default 0
 );
 
+alter table public.orders
+  add column if not exists total numeric(12,2);
+
 alter table public.order_rate_limits enable row level security;
 revoke all on public.order_rate_limits from anon, authenticated;
 
