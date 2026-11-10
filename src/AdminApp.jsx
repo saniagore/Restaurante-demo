@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import AuthScreen from './components/AuthScreen'
 import OrdersBoard from './components/OrdersBoard'
 import MenuManager from './components/MenuManager'
+import { isAdminSession } from './lib/auth'
 import './Admin.css'
 
 function App() {
@@ -32,6 +33,17 @@ function App() {
 
   if (loading) return <div className="loading-screen">Cargando panel...</div>
   if (!session) return <AuthScreen />
+  if (!isAdminSession(session)) {
+    return (
+      <main className="auth-page">
+        <section className="auth-card">
+          <h1>Acceso no autorizado</h1>
+          <p className="muted">Tu cuenta no tiene permisos de administración.</p>
+          <button className="primary-button full-width" onClick={() => supabase.auth.signOut()}>Cerrar sesión</button>
+        </section>
+      </main>
+    )
+  }
 
   return (
     <div className="admin-shell">

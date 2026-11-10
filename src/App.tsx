@@ -1,38 +1,15 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { useCart, type CartItem, type Dish } from './lib/cart'
+import { buildCheckoutInput, createCheckoutPayload } from './lib/orders'
 import './App.css'
 
-export type Dish = { id: string; name: string; description: string; price: number; image_url: string; category?: string }
-export type CartItem = Dish & { quantity: number }
 type Order = { id: string; track_token: string; status: string; customer_name: string; order_type: string; notes?: string; total?: number }
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 const supabase: SupabaseClient | null = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
-
-interface CartState {
-  items: CartItem[]
-  addItem: (dish: Dish) => void
-  removeItem: (id: string) => void
-  updateQuantity: (id: string, quantity: number) => void
-  clearCart: () => void
-  total: () => number
-}
-
-export const useCart = create<CartState>()(persist((set, get) => ({
-  items: [],
-  addItem: (dish) => set(({ items }) => {
-    const found = items.find((item) => item.id === dish.id)
-    return { items: found ? items.map((item) => item.id === dish.id ? { ...item, quantity: item.quantity + 1 } : item) : [...items, { ...dish, quantity: 1 }] }
-  }),
-  removeItem: (id) => set(({ items }) => ({ items: items.filter((item) => item.id !== id) })),
-  updateQuantity: (id, quantity) => set(({ items }) => ({ items: quantity > 0 ? items.map((item) => item.id === id ? { ...item, quantity } : item) : items.filter((item) => item.id !== id) })),
-  clearCart: () => set({ items: [] }),
-  total: () => get().items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-}), { name: 'restaurant-cart' }))
 
 function Icon({ name, size = 20 }: { name: 'bag' | 'plus' | 'minus' | 'arrow' | 'clock' | 'check' | 'close' | 'back'; size?: number }) {
   const paths = {
@@ -123,13 +100,13 @@ function Checkout({ close, navigate, onBack }: { close: () => void; navigate: (t
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError('')
     try {
+      const payload = createCheckoutPayload(buildCheckoutInput(items, name, orderType, notes))
       let token = `demo-${Date.now().toString(36)}`
       if (supabase) {
-        const { data: order, error: orderError } = await supabase.from('orders').insert({ customer_name: name, order_type: orderType, notes, payment_method: 'cash', total }).select('id,track_token').single()
-        if (orderError || !order) throw orderError || new Error('No se pudo crear la orden')
-        const { error: itemsError } = await supabase.from('order_items').insert(items.map((item) => ({ order_id: order.id, dish_id: item.id, quantity: item.quantity, unit_price: item.price })))
-        if (itemsError) throw itemsError
-        token = order.track_token
+        const { data: order, error: orderError } = await supabase.rpc('create_order_secure', { p_order: payload })
+          const createdOrder = order?.[0]
+          if (orderError || !createdOrder) throw orderError || new Error('No se pudo crear la orden')
+          token = createdOrder.track_token
       }
       clearCart(); close(); navigate(`/track/${token}`)
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'No pudimos enviar tu pedido. Intenta de nuevo.'); setSaving(false) }
@@ -145,8 +122,9 @@ function TrackingPage({ token, navigate }: { token: string; navigate: (to: strin
     if (!supabase) { setOrder({ id: 'demo', track_token: token, status: 'preparing', customer_name: 'amigo', order_type: 'pickup', total: 32.4 }); setLoading(false); return }
     let channel: ReturnType<typeof supabase.channel> | undefined
     const load = async () => {
-      const { data, error: loadError } = await supabase.from('orders').select('*').eq('track_token', token).single()
-      if (loadError) setError('No encontramos una orden con este código.')
+      const { data: orders, error: loadError } = await supabase.rpc('get_order_by_token', { p_token: token })
+      const data = orders?.[0]
+      if (loadError || !data) setError('No encontramos una orden con este código.')
       else { setOrder(data as Order); channel = supabase.channel(`order-${data.id}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${data.id}` }, (payload) => setOrder(payload.new as Order)).subscribe() }
       setLoading(false)
     }
