@@ -8,15 +8,6 @@ export type Dish = { id: string; name: string; description: string; price: numbe
 export type CartItem = Dish & { quantity: number }
 type Order = { id: string; track_token: string; status: string; customer_name: string; order_type: string; notes?: string; total?: number }
 
-const demoDishes: Dish[] = [
-  { id: '1', name: 'Bowl de la casa', description: 'Arroz jazmín, vegetales frescos, aguacate y salsa de la casa.', price: 14.5, image_url: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=85', category: 'Favoritos' },
-  { id: '2', name: 'Pollo al limón', description: 'Pollo dorado, papas rústicas, ensalada y hierbas frescas.', price: 16.9, image_url: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=800&q=85', category: 'Platos fuertes' },
-  { id: '3', name: 'Pasta cremosa', description: 'Pasta artesanal, champiñones, parmesano y pimienta negra.', price: 15.75, image_url: 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=800&q=85', category: 'Platos fuertes' },
-  { id: '4', name: 'Tostada de aguacate', description: 'Pan de masa madre, aguacate, huevo y semillas tostadas.', price: 10.25, image_url: 'https://images.unsplash.com/photo-1588137378633-dea1336ce1e2?auto=format&fit=crop&w=800&q=85', category: 'Para compartir' },
-  { id: '5', name: 'Cheesecake de temporada', description: 'Cremoso cheesecake con fruta fresca y coulis de frutos rojos.', price: 8.5, image_url: 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=800&q=85', category: 'Dulce final' },
-  { id: '6', name: 'Limonada de hierbabuena', description: 'Limón recién exprimido, hierbabuena y un toque de jengibre.', price: 5.5, image_url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=800&q=85', category: 'Bebidas' },
-]
-
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 const supabase: SupabaseClient | null = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
@@ -66,7 +57,7 @@ function App() {
 }
 
 function MenuPage({ navigate }: { navigate: (to: string) => void }) {
-  const [dishes, setDishes] = useState<Dish[]>(demoDishes)
+  const [dishes, setDishes] = useState<Dish[]>([])
   const [loading, setLoading] = useState(Boolean(supabase))
   const [cartOpen, setCartOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -74,8 +65,19 @@ function MenuPage({ navigate }: { navigate: (to: string) => void }) {
   const addItem = useCart((state) => state.addItem)
   useEffect(() => {
     if (!supabase) return
-    supabase.from('dishes').select('id,name,description,price,image_url,category').eq('is_available', true).order('created_at')
-      .then(({ data, error }) => { if (!error && data?.length) setDishes(data as Dish[]); setLoading(false) })
+    supabase.from('dishes').select('id,nombre,descripcion,precio,imagen_url').eq('is_available', true).order('created_at')
+      .then(({ data, error }) => {
+        if (!error) {
+          setDishes((data || []).map((dish) => ({
+            id: dish.id,
+            name: dish.nombre,
+            description: dish.descripcion || '',
+            price: dish.precio,
+            image_url: dish.imagen_url || '',
+          })))
+        }
+        setLoading(false)
+      })
   }, [])
   const visible = dishes.filter((dish) => `${dish.name} ${dish.description}`.toLowerCase().includes(search.toLowerCase()))
   const categories = [...new Set(visible.map((dish) => dish.category).filter(Boolean))]
