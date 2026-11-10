@@ -40,6 +40,7 @@ function MenuPage({ navigate }: { navigate: (to: string) => void }) {
   const [cartOpen, setCartOpen] = useState(false)
   const [search, setSearch] = useState('')
   const items = useCart((state) => state.items)
+  const cartTotal = useCart((state) => state.total())
   const addItem = useCart((state) => state.addItem)
   const loadDishes = useCallback(async () => {
     setMenuLoading(true)
@@ -78,10 +79,11 @@ function MenuPage({ navigate }: { navigate: (to: string) => void }) {
       <section className="hero-section"><div className="hero-copy"><p className="eyebrow">HAMBURGUESERÍA DE PALMIRA</p><h1>El placer<br /><em>en cada bocado.</em></h1><p className="hero-description">Burgers brutales, papas cargadas y shakes que convierten cualquier momento en una experiencia DMonkey.</p><a className="gold-button" href="#menu">Ver el menú <Icon name="arrow" size={16} /></a></div><div className="hero-art"><img src="/dmonkey-hero-fries.png" alt="Papas con cheddar y tocineta DMonkey" /><span className="hero-sticker">PAPAS<br />IRRESISTIBLES</span></div></section>
       <section className="brand-pulse"><div className="pulse-copy"><p className="eyebrow">MONKSHOP.CO</p><h2>Una burger<br /><em>es una experiencia.</em></h2><p>Nos gusta hacer ruido, servir caliente y que cada visita termine en antojo.</p><a href="#menu">Descubre el menú <Icon name="arrow" size={15} /></a></div><div className="pulse-grid"><img src="/dmonkey-social-caribbean.png" alt="Burger Caribbean" /><img src="/dmonkey-social-bacon.png" alt="Burger Bacon Jam" /><img src="/dmonkey-social-big-cheese.png" alt="Burger Big Cheese" /><img src="/dmonkey-social-golden.png" alt="Burger Golden Velvet" /></div></section>
       <section id="menu" className="menu-section"><div className="section-heading"><div><p className="eyebrow">ORDENA LOCAL</p><h2>Elige tu próxima obsesión</h2></div><label className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el menú" aria-label="Buscar en el menú" /></label></div>
-        {menuLoading ? <div className="loading" aria-live="polite">Cargando el menú...</div> : menuError ? <div className="empty-search"><p>{menuError}</p><button className="outline-button retry-button" onClick={loadDishes}>Reintentar</button></div> : <div className="dish-grid">{visible.map((dish) => <DishCard key={dish.id} dish={dish} onAdd={() => { addItem(dish); setCartOpen(true) }} />)}</div>}{!menuLoading && !menuError && visible.length === 0 && <div className="empty-search">No encontramos ese plato. Intenta con otra búsqueda.</div>}
+        {menuLoading ? <div className="loading" aria-live="polite">Cargando el menú...</div> : menuError ? <div className="empty-search"><p>{menuError}</p><button className="outline-button retry-button" onClick={loadDishes}>Reintentar</button></div> : <div className="dish-grid">{visible.map((dish) => <DishCard key={dish.id} dish={dish} onAdd={() => addItem(dish)} />)}</div>}{!menuLoading && !menuError && visible.length === 0 && <div className="empty-search">No encontramos ese plato. Intenta con otra búsqueda.</div>}
       </section>
     </main>
     <footer><span className="brand-mark">D</span><span>Experiencia, momentos y placer.</span><span className="footer-right">© 2026 DMonkey Burger House</span></footer>
+    {items.length > 0 && <button className="floating-cart" onClick={() => setCartOpen(true)} aria-label={`Abrir pedido, ${items.length} productos`}><span className="floating-cart-icon"><Icon name="bag" size={20} /><b>{items.reduce((sum, item) => sum + item.quantity, 0)}</b></span><span><strong>Tu pedido</strong><small>{money.format(cartTotal)}</small></span><Icon name="arrow" size={17} /></button>}
     {cartOpen && <CartDrawer close={() => setCartOpen(false)} navigate={navigate} />}
   </div>
 }
@@ -109,13 +111,21 @@ function Checkout({ close, navigate, onBack }: { close: () => void; navigate: (t
   const clearCart = useCart((state) => state.clearCart)
   const [name, setName] = useState('')
   const [orderType, setOrderType] = useState('pickup')
+  const [deliveryFee, setDeliveryFee] = useState(0)
+  const [deliveryAddress, setDeliveryAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    if (!supabase) return
+    supabase.from('restaurant_settings').select('delivery_fee').eq('id', true).single()
+      .then(({ data, error }) => { if (!error) setDeliveryFee(Number(data?.delivery_fee || 0)) })
+  }, [])
+  const checkoutTotal = total + (orderType === 'delivery' ? deliveryFee : 0)
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError('')
     try {
-      const payload = createCheckoutPayload(buildCheckoutInput(items, name, orderType, notes))
+      const payload = createCheckoutPayload(buildCheckoutInput(items, name, orderType, notes, deliveryAddress))
       let token = `demo-${Date.now().toString(36)}`
       if (supabase) {
         const { data: order, error: orderError } = await supabase.rpc('create_order_secure', { p_order: payload })
@@ -127,7 +137,7 @@ function Checkout({ close, navigate, onBack }: { close: () => void; navigate: (t
       clearCart(); close(); navigate(`/track/${token}`)
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'No pudimos enviar tu pedido. Intenta de nuevo.'); setSaving(false) }
   }
-  return <form className="checkout-form" onSubmit={submit}><button type="button" className="back-link" onClick={onBack}><Icon name="back" size={16} /> Volver al pedido</button><label>¿Cómo quieres recibirlo?<div className="radio-group"><button type="button" className={orderType === 'pickup' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('pickup')}><span>Recoger</span><small>Listo en el local</small><i /></button><button type="button" className={orderType === 'delivery' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('delivery')}><span>Domicilio</span><small>Te lo llevamos</small><i /></button></div></label><label>Tu nombre<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="¿Cómo te llamamos?" /></label><label>Notas para cocina <span className="optional">Opcional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Alergias, indicaciones..." rows={3} /></label><div className="payment-note"><span>Forma de pago</span><strong>💵 Efectivo</strong></div>{error && <p className="form-error">{error}</p>}<button disabled={saving} className="primary-button" type="submit">{saving ? 'Enviando...' : `Confirmar pedido · ${money.format(total)}`} {!saving && <Icon name="arrow" size={17} />}</button></form>
+  return <form className="checkout-form" onSubmit={submit}><button type="button" className="back-link" onClick={onBack}><Icon name="back" size={16} /> Volver al pedido</button><label>¿Cómo quieres recibirlo?<div className="radio-group"><button type="button" className={orderType === 'pickup' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('pickup')}><span>Recoger</span><small>Listo en el local</small><i /></button><button type="button" className={orderType === 'delivery' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('delivery')}><span>Domicilio</span><small>Te lo llevamos</small><i /></button></div></label><label>Tu nombre<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="¿Cómo te llamamos?" /></label>{orderType === 'delivery' && <label>Dirección de entrega<input required value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Calle, número, barrio y referencias" /></label>}<label>Notas para cocina <span className="optional">Opcional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Alergias, indicaciones..." rows={3} /></label><div className="payment-note"><span>Forma de pago</span><strong>💵 Efectivo</strong></div><div className="checkout-total"><span>Subtotal</span><strong>{money.format(total)}</strong>{orderType === 'delivery' && <><span>Domicilio</span><strong>{money.format(deliveryFee)}</strong></>}<span>Total</span><strong>{money.format(checkoutTotal)}</strong></div>{error && <p className="form-error">{error}</p>}<button disabled={saving} className="primary-button" type="submit">{saving ? 'Enviando...' : `Confirmar pedido · ${money.format(checkoutTotal)}`} {!saving && <Icon name="arrow" size={17} />}</button></form>
 }
 
 function TrackingPage({ token, navigate }: { token: string; navigate: (to: string) => void }) {
