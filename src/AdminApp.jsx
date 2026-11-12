@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import AuthScreen from './components/AuthScreen'
+import Dashboard from './components/Dashboard'
 import OrdersBoard from './components/OrdersBoard'
 import MenuManager from './components/MenuManager'
 import { isAdminSession } from './lib/auth'
@@ -9,7 +10,7 @@ import './Admin.css'
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [activeView, setActiveView] = useState('orders')
+  const [activeView, setActiveView] = useState('dashboard')
 
   useEffect(() => {
     let mounted = true
@@ -49,16 +50,25 @@ function App() {
     <div className="admin-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">R</span>
-          <div><strong>Rincón</strong><small>Panel interno</small></div>
+          <span className="brand-mark">M</span>
+          <div><strong>Mesa abierta</strong><small>Panel interno</small></div>
         </div>
         <nav className="main-nav" aria-label="Navegación principal">
-          <button className={activeView === 'orders' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('orders')}>
-            <span>▣</span> Órdenes
-          </button>
-          <button className={activeView === 'menu' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('menu')}>
-            <span>◈</span> Menú
-          </button>
+          <div className="nav-group">
+            <p className="nav-label">Operación</p>
+            <button className={activeView === 'dashboard' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('dashboard')}>
+              <span>⌂</span> Resumen
+            </button>
+            <button className={activeView === 'orders' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('orders')}>
+              <span>▣</span> Órdenes
+            </button>
+          </div>
+          <div className="nav-group">
+            <p className="nav-label">Catálogo</p>
+            <button className={activeView === 'menu' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('menu')}>
+              <span>◈</span> Menú
+            </button>
+          </div>
         </nav>
         <div className="sidebar-footer">
           <div className="user-chip"><span className="avatar">{(session.user.email || 'A')[0].toUpperCase()}</span><span>{session.user.email}</span></div>
@@ -66,7 +76,7 @@ function App() {
         </div>
       </aside>
       <main className="main-content">
-        {activeView === 'orders' ? <OrdersBoard /> : <MenuManager />}
+        {activeView === 'dashboard' ? <Dashboard onOpenOrders={() => setActiveView('orders')} /> : activeView === 'orders' ? <OrdersBoard /> : <MenuManager />}
       </main>
     </div>
   )

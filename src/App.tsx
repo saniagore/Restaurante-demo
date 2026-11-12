@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { useCart, type CartItem, type Dish } from './lib/cart'
 import { buildCheckoutInput, createCheckoutPayload } from './lib/orders'
@@ -9,7 +9,7 @@ type Order = { id: string; track_token: string; status: string; customer_name: s
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 const supabase: SupabaseClient | null = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
-const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
+const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
 
 function Icon({ name, size = 20 }: { name: 'bag' | 'plus' | 'minus' | 'arrow' | 'clock' | 'check' | 'close' | 'back'; size?: number }) {
   const paths = {
@@ -35,38 +35,54 @@ function App() {
 
 function MenuPage({ navigate }: { navigate: (to: string) => void }) {
   const [dishes, setDishes] = useState<Dish[]>([])
-  const [loading, setLoading] = useState(Boolean(supabase))
+  const [menuError, setMenuError] = useState('')
+  const [menuLoading, setMenuLoading] = useState(true)
   const [cartOpen, setCartOpen] = useState(false)
   const [search, setSearch] = useState('')
   const items = useCart((state) => state.items)
+  const cartTotal = useCart((state) => state.total())
   const addItem = useCart((state) => state.addItem)
-  useEffect(() => {
-    if (!supabase) return
-    supabase.from('dishes').select('id,nombre,descripcion,precio,imagen_url').eq('is_available', true).order('created_at')
-      .then(({ data, error }) => {
-        if (!error) {
-          setDishes((data || []).map((dish) => ({
-            id: dish.id,
-            name: dish.nombre,
-            description: dish.descripcion || '',
-            price: dish.precio,
-            image_url: dish.imagen_url || '',
-          })))
-        }
-        setLoading(false)
-      })
+  const loadDishes = useCallback(async () => {
+    setMenuLoading(true)
+    setMenuError('')
+    if (!supabase) {
+      setMenuError('El menú requiere una conexión con Supabase.')
+      setMenuLoading(false)
+      return
+    }
+    const { data, error } = await supabase
+      .from('dishes')
+      .select('id,nombre,descripcion,precio,imagen_url')
+      .eq('is_available', true)
+      .order('nombre')
+    if (error) {
+      setMenuError('No se pudo cargar el menú. Intenta de nuevo.')
+    } else {
+      setDishes((data || []).map((dish) => ({
+          id: dish.id,
+          name: dish.nombre,
+          description: dish.descripcion || '',
+          price: Number(dish.precio),
+          image_url: dish.imagen_url || '',
+      })))
+    }
+    setMenuLoading(false)
   }, [])
-  const visible = dishes.filter((dish) => `${dish.name} ${dish.description}`.toLowerCase().includes(search.toLowerCase()))
-  const categories = [...new Set(visible.map((dish) => dish.category).filter(Boolean))]
+  useEffect(() => { loadDishes() }, [loadDishes])
+  const visible = dishes.filter((dish) => {
+    const matchesSearch = `${dish.name} ${dish.description}`.toLowerCase().includes(search.toLowerCase())
+    return matchesSearch
+  })
   return <div className="app-shell">
-    <header className="topbar"><a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/') }}><span className="brand-mark">n</span><span>nuestra mesa<small>cocina cotidiana</small></span></a><nav><a href="#menu">Menú</a><a href="#about">Nuestra esencia</a></nav><button className="cart-button" onClick={() => setCartOpen(true)} aria-label="Abrir carrito"><Icon name="bag" /><span>Tu pedido</span>{items.length > 0 && <b>{items.reduce((sum, item) => sum + item.quantity, 0)}</b>}</button></header>
+    <header className="topbar"><a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/') }}><span className="brand-mark">M</span><span>mesa abierta<small>cocina para compartir</small></span></a><nav><a href="#menu">Menú</a><a href="#about">El restaurante</a></nav><button className="cart-button" onClick={() => setCartOpen(true)} aria-label="Abrir carrito"><Icon name="bag" /><span>Tu pedido</span>{items.length > 0 && <b>{items.reduce((sum, item) => sum + item.quantity, 0)}</b>}</button></header>
     <main>
-      <section className="hero-section"><div className="hero-copy"><p className="eyebrow">COMIDA HECHA CON CALMA</p><h1>Un buen día<br /><em>empieza en la mesa.</em></h1><p className="hero-description">Ingredientes honestos, recetas que reconfortan<br className="desktop" /> y un espacio para compartir lo que importa.</p><a className="text-link" href="#menu">Explorar el menú <Icon name="arrow" size={16} /></a></div><div className="hero-art"><div className="hero-circle"></div><img src="https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=900&q=85" alt="Plato servido en una mesa" /></div></section>
-      <section id="menu" className="menu-section"><div className="section-heading"><div><p className="eyebrow">PARA HOY</p><h2>Elige tu momento</h2></div><label className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el menú" aria-label="Buscar en el menú" /></label></div>
-        {loading ? <div className="loading">Cargando el menú...</div> : <>{categories.length > 0 && <div className="category-row">{categories.map((category) => <a key={category} href={`#${category}`}>{category}</a>)}</div>}<div className="dish-grid">{visible.map((dish) => <DishCard key={dish.id} dish={dish} onAdd={() => { addItem(dish); setCartOpen(true) }} />)}</div>{visible.length === 0 && <div className="empty-search">No encontramos ese plato. Intenta con otra búsqueda.</div>}</>}
+      <section className="hero-section"><div className="hero-copy"><p className="eyebrow">SABORES PARA COMPARTIR</p><h1>Un buen momento<br /><em>empieza en la mesa.</em></h1><p className="hero-description">Ingredientes frescos, recetas hechas con cuidado y opciones para disfrutar a tu manera.</p><a className="gold-button" href="#menu">Explorar el menú <Icon name="arrow" size={16} /></a></div><div className="hero-art"><img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=85" alt="Plato preparado para compartir" /></div></section>
+      <section id="menu" className="menu-section"><div className="section-heading"><div><p className="eyebrow">NUESTRO MENÚ</p><h2>Elige algo delicioso</h2></div><label className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el menú" aria-label="Buscar en el menú" /></label></div>
+        {menuLoading ? <div className="loading" aria-live="polite">Cargando el menú...</div> : menuError ? <div className="empty-search"><p>{menuError}</p><button className="outline-button retry-button" onClick={loadDishes}>Reintentar</button></div> : <div className="dish-grid">{visible.map((dish) => <DishCard key={dish.id} dish={dish} onAdd={() => addItem(dish)} />)}</div>}{!menuLoading && !menuError && visible.length === 0 && <div className="empty-search">No encontramos ese plato. Intenta con otra búsqueda.</div>}
       </section>
     </main>
-    <footer><span className="brand-mark">n</span><span>Hecho para compartir.</span><span className="footer-right">© 2025 nuestra mesa</span></footer>
+    <footer><span className="brand-mark">M</span><span>Hecho para compartir.</span><span className="footer-right">© 2026 mesa abierta</span></footer>
+    {items.length > 0 && <button className="floating-cart" onClick={() => setCartOpen(true)} aria-label={`Abrir pedido, ${items.length} productos`}><span className="floating-cart-icon"><Icon name="bag" size={20} /><b>{items.reduce((sum, item) => sum + item.quantity, 0)}</b></span><span><strong>Tu pedido</strong><small>{money.format(cartTotal)}</small></span><Icon name="arrow" size={17} /></button>}
     {cartOpen && <CartDrawer close={() => setCartOpen(false)} navigate={navigate} />}
   </div>
 }
@@ -94,24 +110,33 @@ function Checkout({ close, navigate, onBack }: { close: () => void; navigate: (t
   const clearCart = useCart((state) => state.clearCart)
   const [name, setName] = useState('')
   const [orderType, setOrderType] = useState('pickup')
+  const [deliveryFee, setDeliveryFee] = useState(0)
+  const [deliveryAddress, setDeliveryAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  useEffect(() => {
+    if (!supabase) return
+    supabase.from('restaurant_settings').select('delivery_fee').eq('id', true).single()
+      .then(({ data, error }) => { if (!error) setDeliveryFee(Number(data?.delivery_fee || 0)) })
+  }, [])
+  const checkoutTotal = total + (orderType === 'delivery' ? deliveryFee : 0)
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError('')
     try {
-      const payload = createCheckoutPayload(buildCheckoutInput(items, name, orderType, notes))
+      const payload = createCheckoutPayload(buildCheckoutInput(items, name, orderType, notes, deliveryAddress))
       let token = `demo-${Date.now().toString(36)}`
       if (supabase) {
         const { data: order, error: orderError } = await supabase.rpc('create_order_secure', { p_order: payload })
           const createdOrder = order?.[0]
-          if (orderError || !createdOrder) throw orderError || new Error('No se pudo crear la orden')
+          if (orderError) throw new Error(orderError.message || orderError.details || 'No se pudo crear la orden')
+          if (!createdOrder) throw new Error('No se pudo crear la orden')
           token = createdOrder.track_token
       }
       clearCart(); close(); navigate(`/track/${token}`)
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'No pudimos enviar tu pedido. Intenta de nuevo.'); setSaving(false) }
   }
-  return <form className="checkout-form" onSubmit={submit}><button type="button" className="back-link" onClick={onBack}><Icon name="back" size={16} /> Volver al pedido</button><label>¿Cómo quieres recibirlo?<div className="radio-group"><button type="button" className={orderType === 'pickup' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('pickup')}><span>Recoger</span><small>Listo en el local</small><i /></button><button type="button" className={orderType === 'delivery' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('delivery')}><span>Domicilio</span><small>Te lo llevamos</small><i /></button></div></label><label>Tu nombre<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="¿Cómo te llamamos?" /></label><label>Notas para cocina <span className="optional">Opcional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Alergias, indicaciones..." rows={3} /></label><div className="payment-note"><span>Forma de pago</span><strong>💵 Efectivo</strong></div>{error && <p className="form-error">{error}</p>}<button disabled={saving} className="primary-button" type="submit">{saving ? 'Enviando...' : `Confirmar pedido · ${money.format(total)}`} {!saving && <Icon name="arrow" size={17} />}</button></form>
+  return <form className="checkout-form" onSubmit={submit}><button type="button" className="back-link" onClick={onBack}><Icon name="back" size={16} /> Volver al pedido</button><label>¿Cómo quieres recibirlo?<div className="radio-group"><button type="button" className={orderType === 'pickup' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('pickup')}><span>Recoger</span><small>Listo en el local</small><i /></button><button type="button" className={orderType === 'delivery' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('delivery')}><span>Domicilio</span><small>Te lo llevamos</small><i /></button></div></label><label>Tu nombre<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="¿Cómo te llamamos?" /></label>{orderType === 'delivery' && <label>Dirección de entrega<input required value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Calle, número, barrio y referencias" /></label>}<label>Notas para cocina <span className="optional">Opcional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Alergias, indicaciones..." rows={3} /></label><div className="payment-note"><span>Forma de pago</span><strong>💵 Efectivo</strong></div><div className="checkout-total"><span>Subtotal</span><strong>{money.format(total)}</strong>{orderType === 'delivery' && <><span>Domicilio</span><strong>{money.format(deliveryFee)}</strong></>}<span>Total</span><strong>{money.format(checkoutTotal)}</strong></div>{error && <p className="form-error">{error}</p>}<button disabled={saving} className="primary-button" type="submit">{saving ? 'Enviando...' : `Confirmar pedido · ${money.format(checkoutTotal)}`} {!saving && <Icon name="arrow" size={17} />}</button></form>
 }
 
 function TrackingPage({ token, navigate }: { token: string; navigate: (to: string) => void }) {
