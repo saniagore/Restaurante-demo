@@ -6,7 +6,7 @@ const formatTime = (value) => new Date(value).toLocaleTimeString('es-CO', { hour
 const todayKey = () => new Date().toLocaleDateString('en-CA')
 const orderTotal = (order) => Number(order.total_amount ?? order.total ?? 0)
 const uniqueOrders = (orders) => Array.from(new Map(orders.map((order) => [order.id, order])).values())
-const activeStatuses = new Set(['pending', 'accepted', 'preparing', 'on_the_way'])
+const activeStatuses = new Set(['pending', 'accepted', 'preparing', 'on_the_way', 'completed'])
 
 function Dashboard({ onOpenOrders }) {
   const [orders, setOrders] = useState([])
@@ -68,7 +68,7 @@ function Dashboard({ onOpenOrders }) {
           </article>
           <article className="panel day-status">
             <div className="panel-heading"><div><h2>Estado de operación</h2><p className="muted">Órdenes activas en este momento.</p></div></div>
-            <div className="status-summary"><div><span className="status-dot accepted" />Aceptadas<strong>{orders.filter((order) => order.status === 'accepted').length}</strong></div><div><span className="status-dot preparing" />Preparando<strong>{orders.filter((order) => order.status === 'preparing').length}</strong></div><div><span className="status-dot on-the-way" />En camino<strong>{orders.filter((order) => order.status === 'on_the_way').length}</strong></div></div>
+            <div className="status-summary"><div><span className="status-dot accepted" />Aceptadas<strong>{orders.filter((order) => order.status === 'accepted').length}</strong></div><div><span className="status-dot preparing" />Preparando<strong>{orders.filter((order) => order.status === 'preparing').length}</strong></div><div><span className="status-dot on-the-way" />En camino<strong>{orders.filter((order) => order.status === 'on_the_way').length}</strong></div><div><span className="status-dot completed" />Completadas<strong>{orders.filter((order) => order.status === 'completed').length}</strong></div></div>
           </article>
         </section>
       </>}

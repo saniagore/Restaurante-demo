@@ -5,7 +5,8 @@ const columns = [
   { key: 'pending', label: 'Pendientes', icon: '◷', next: 'accepted', action: 'Aceptar pedido' },
   { key: 'accepted', label: 'Aceptadas', icon: '✓', next: 'preparing', action: 'Empezar a preparar' },
   { key: 'preparing', label: 'Preparando', icon: '◌', next: 'on_the_way', action: 'Marcar en camino' },
-  { key: 'on_the_way', label: 'En camino', icon: '⌁', next: null, action: 'Pedido completado' },
+  { key: 'on_the_way', label: 'En camino', icon: '⌁', next: 'completed', action: 'Marcar completado' },
+  { key: 'completed', label: 'Completadas', icon: '✓', next: null, action: 'Pedido completado' },
 ]
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`
@@ -17,6 +18,7 @@ function OrdersBoard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updating, setUpdating] = useState(null)
+  const [collapsedColumns, setCollapsedColumns] = useState({ completed: true })
   const loadOrders = useCallback(async () => {
     setLoading(true)
     const { data, error: queryError } = await supabase
@@ -71,13 +73,15 @@ function OrdersBoard() {
       </header>
       {error && <div className="alert" role="alert">{error}<button aria-label="Cerrar alerta" onClick={() => setError('')}>×</button></div>}
       {loading ? <div className="empty-state">Cargando órdenes...</div> : <div className="orders-board">
-        {columns.map((column) => <section className="order-column" key={column.key}>
-          <div className="column-heading"><h2><span className={`status-icon ${column.key}`}>{column.icon}</span>{column.label}</h2><span className="count-badge">{groupedOrders[column.key]?.length || 0}</span></div>
-          <div className="order-list">
+        {columns.map((column) => {
+          const collapsed = Boolean(collapsedColumns[column.key])
+          return <section className={`order-column ${collapsed ? 'collapsed' : ''}`} key={column.key}>
+          <div className="column-heading"><button className="column-toggle" type="button" aria-expanded={!collapsed} onClick={() => setCollapsedColumns((current) => ({ ...current, [column.key]: !current[column.key] }))}><h2><span className={`status-icon ${column.key}`}>{column.icon}</span>{column.label}</h2><span className="count-badge">{groupedOrders[column.key]?.length || 0}</span></button><span className="collapse-icon" aria-hidden="true">{collapsed ? '+' : '−'}</span></div>
+          {!collapsed && <div className="order-list">
             {groupedOrders[column.key]?.map((order) => <OrderCard key={order.id} order={order} column={column} updating={updating} onStatusChange={updateStatus} />)}
             {!groupedOrders[column.key]?.length && <div className="column-empty">No hay pedidos aquí</div>}
-          </div>
-        </section>)}
+          </div>}
+        </section>})}
       </div>}
     </>
   )
