@@ -20,8 +20,8 @@ function AuthScreen() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <span className="brand-mark large">R</span>
-        <p className="eyebrow">RINCÓN · ADMINISTRACIÓN</p>
+        <span className="brand-mark large">M</span>
+        <p className="eyebrow">MESA ABIERTA · ADMINISTRACIÓN</p>
         <h1>Bienvenido de nuevo</h1>
         <p className="muted">Inicia sesión para gestionar tu restaurante.</p>
         <form onSubmit={handleSubmit} className="auth-form">
