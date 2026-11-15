@@ -81,6 +81,7 @@ Alternativa: copiar el contenido de cada archivo en el SQL Editor del panel de S
 
 Notas:
 
+- La regla de pedido único **no depende del nombre del estado inicial**: `is_active` se calcula comparando el estado como texto, así que funciona igual si tu enum usa `pending`, `received` u otro valor.
 - El pedido se rechaza con el código `22023` si no incluye teléfono válido, versión legal vigente, más de 50 ítems, platos duplicados o cantidades fuera de 1-99.
 - Si el teléfono o el navegador ya tienen un pedido activo, la RPC responde `Ya tienes un pedido activo` (código `P0001`) y no crea una fila.
 - El mismo `client_token` devuelve el pedido ya creado: reintentar no duplica.

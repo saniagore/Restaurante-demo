@@ -66,7 +66,7 @@ begin
 
   update public.orders
      set status = 'cancelled'
-   where status = 'pending'
+   where status::text not in ('accepted', 'preparing', 'on_the_way', 'completed', 'cancelled')
      and created_at < now() - p_age;
 
   get diagnostics affected_count = row_count;
@@ -96,7 +96,7 @@ begin
          notes = null,
          client_id = null,
          anonymized_at = now()
-   where status in ('completed', 'cancelled')
+   where status::text in ('completed', 'cancelled')
      and created_at < now() - p_retention
      and anonymized_at is null;
 
