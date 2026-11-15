@@ -1,16 +1,22 @@
 import DOMPurify from 'dompurify'
 import { z } from 'zod'
 import type { CartItem } from './cart'
+import { LEGAL_VERSION } from '../config/business'
 
-const safeText = (max: number, min = 0) => z.string().trim().min(min).max(max).transform((value) =>
+const safeText = (max: number, min = 0) => z.string().trim().min(min, { message: 'Este campo es obligatorio' }).max(max, { message: `Máximo ${max} caracteres` }).transform((value) =>
   DOMPurify.sanitize(value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }),
 )
+
+export const TERMS_MESSAGE =
+  'Debes aceptar los Términos y Condiciones y la Política de Tratamiento de Datos Personales para continuar.'
 
 export const checkoutSchema = z.object({
   customerName: safeText(100, 1),
   orderType: z.enum(['pickup', 'delivery']),
   deliveryAddress: z.string().trim().max(300).optional().default(''),
   notes: safeText(500).optional().default(''),
+  acceptedTerms: z.boolean().refine((accepted) => accepted === true, { message: TERMS_MESSAGE }),
+  legalVersion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Versión legal inválida' }),
   items: z.array(z.object({
     id: z.string().uuid(),
     quantity: z.number().int().min(1).max(99),
@@ -24,22 +30,38 @@ export const checkoutSchema = z.object({
 export type CheckoutInput = z.input<typeof checkoutSchema>
 
 export function createCheckoutPayload(input: CheckoutInput) {
-  const parsed = checkoutSchema.parse(input)
+  const result = checkoutSchema.safeParse(input)
+  if (!result.success) {
+    throw new Error(result.error.issues[0]?.message ?? 'Revisa los datos del pedido')
+  }
+  const parsed = result.data
   return {
     customer_name: parsed.customerName,
     order_type: parsed.orderType,
     delivery_address: parsed.orderType === 'delivery' ? parsed.deliveryAddress : null,
     notes: parsed.notes,
+    legal_version: parsed.legalVersion,
     items: parsed.items.map(({ id, quantity }) => ({ dish_id: id, quantity })),
   }
 }
 
-export function buildCheckoutInput(items: CartItem[], customerName: string, orderType: string, notes: string, deliveryAddress = '') {
+export type CheckoutDetails = {
+  customerName: string
+  orderType: string
+  notes?: string
+  deliveryAddress?: string
+  acceptedTerms?: boolean
+  legalVersion?: string
+}
+
+export function buildCheckoutInput(items: CartItem[], details: CheckoutDetails) {
   return {
-    customerName,
-    orderType,
-    notes,
-    deliveryAddress,
+    customerName: details.customerName,
+    orderType: details.orderType as CheckoutInput['orderType'],
+    notes: details.notes ?? '',
+    deliveryAddress: details.deliveryAddress ?? '',
+    acceptedTerms: details.acceptedTerms ?? false,
+    legalVersion: details.legalVersion ?? LEGAL_VERSION,
     items: items.map(({ id, quantity }) => ({ id, quantity })),
   }
 }
