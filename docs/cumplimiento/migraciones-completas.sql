@@ -2,9 +2,9 @@
 -- Restaurante-demo · Migraciones consolidadas
 -- ============================================================================
 -- Reúne en un solo archivo el esquema base mínimo, las 11 migraciones que ya
--- existían en el repositorio, las 2 de cumplimiento legal y las 2 de pedido
--- único, teléfono y cancelación (15 en total). Está pensado para pegarse
--- completo en Supabase:
+-- existían en el repositorio, las 2 de cumplimiento legal, las 2 de pedido
+-- único, teléfono y cancelación y la de `pickup` (16 en total). Está pensado
+-- para pegarse completo en Supabase:
 --
 --   Supabase → SQL Editor → New query → pegar → Run
 --
@@ -876,3 +876,13 @@ begin
   end if;
 end;
 $$;
+
+-- ============================================================================
+-- 12. VALOR 'pickup' DEL ENUM order_type
+-- ============================================================================
+
+-- El enum order_type de algunas bases se creó sin el valor 'pickup'.
+-- La app envía 'pickup' para recoger, así que se agrega para que el insert
+-- de create_order_secure no falle con 22P02.
+
+alter type public.order_type add value if not exists 'pickup';
