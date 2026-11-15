@@ -60,10 +60,14 @@
 .storage-notice-actions { display: flex; gap: 10px; }
 .storage-notice .primary-button, .storage-notice .outline-button { width: auto; margin: 0; padding: 10px 16px; font-size: 11px; }
 
-.consent-field { display: flex; gap: 10px; align-items: flex-start; margin-top: 26px; font-size: 11.5px; line-height: 1.55; color: #4a463f; }
-.consent-field .consent-label { font-weight: 400; }
+.consent-field { display: flex; gap: 12px; align-items: flex-start; margin-top: 26px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 3px; background: #faf7f1; font-size: 11.5px; line-height: 1.55; color: #4a463f; }
+.consent-copy { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0; }
+.consent-label { display: block; font-weight: 500; color: var(--ink); }
+.consent-required { color: var(--muted); font-weight: 400; }
+.consent-links { display: flex; flex-direction: column; gap: 4px; }
+.consent-links a { color: var(--accent-dark); font-size: 11px; text-decoration: underline; text-underline-offset: 2px; }
+.consent-links a:hover { color: var(--accent); }
 .consent-field input[type="checkbox"] { width: 16px; height: 16px; padding: 0; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
-.consent-field a { color: var(--accent-dark); }
 .field-hint { font-size: 10.5px; line-height: 1.55; color: var(--muted); margin: 6px 0 0; font-weight: 400; }
 .field-hint a { color: var(--accent-dark); }
 .cart-tax-note { font-size: 10px; color: var(--muted); margin: 0 0 10px; line-height: 1.5; }

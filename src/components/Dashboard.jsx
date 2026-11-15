@@ -12,6 +12,7 @@ function Dashboard({ onOpenOrders }) {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cancellingId, setCancellingId] = useState(null)
 
   const loadOrders = useCallback(async () => {
     setLoading(true)
@@ -39,6 +40,19 @@ function Dashboard({ onOpenOrders }) {
     return () => { supabase.removeChannel(channel) }
   }, [loadOrders])
 
+  async function cancelOrder(order) {
+    if (!window.confirm('¿Cancelar este pedido? Se liberará el teléfono del cliente.')) return
+    setCancellingId(order.id)
+    const { error: cancelError } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id)
+    if (cancelError) {
+      console.error('No se pudo cancelar el pedido', cancelError)
+      setError('No se pudo cancelar el pedido. Intenta de nuevo.')
+    } else {
+      setOrders((current) => current.map((item) => item.id === order.id ? { ...item, status: 'cancelled' } : item))
+    }
+    setCancellingId(null)
+  }
+
   const todayOrders = useMemo(() => orders.filter((order) => new Date(order.created_at).toLocaleDateString('en-CA') === todayKey()), [orders])
   const pendingOrders = useMemo(() => orders.filter((order) => order.status === 'pending' || !activeStatuses.has(order.status)), [orders])
   const sales = todayOrders.reduce((sum, order) => sum + orderTotal(order), 0)
@@ -64,7 +78,7 @@ function Dashboard({ onOpenOrders }) {
         <section className="dashboard-grid">
           <article className="panel priority-orders">
             <div className="panel-heading"><div><h2>Atención prioritaria</h2><p className="muted">Órdenes que esperan respuesta.</p></div><button className="text-button" onClick={onOpenOrders}>Ver todas</button></div>
-            {pendingOrders.length ? <div className="priority-list">{pendingOrders.slice(0, 5).map((order) => <button className="priority-order" key={order.id} onClick={onOpenOrders}><span className="priority-order-icon">◷</span><span><strong>{order.customer_name || 'Cliente'}</strong><small>#{String(order.id).slice(-5)} · {formatTime(order.created_at)}</small></span><b>{money(orderTotal(order))}</b><span>→</span></button>)}</div> : <div className="empty-state">No hay órdenes pendientes.</div>}
+            {pendingOrders.length ? <div className="priority-list">{pendingOrders.slice(0, 5).map((order) => <div className="priority-order" key={order.id}><button type="button" className="priority-order-main" onClick={onOpenOrders}><span className="priority-order-icon">◷</span><span className="priority-order-info"><strong>{order.customer_name || 'Cliente'}</strong><small>#{String(order.id).slice(-5)} · {formatTime(order.created_at)}</small></span><b>{money(orderTotal(order))}</b></button><button type="button" className="priority-order-cancel" disabled={cancellingId === order.id} onClick={() => cancelOrder(order)}>{cancellingId === order.id ? 'Cancelando...' : 'Cancelar'}</button></div>)}</div> : <div className="empty-state">No hay órdenes pendientes.</div>}
           </article>
           <article className="panel day-status">
             <div className="panel-heading"><div><h2>Estado de operación</h2><p className="muted">Órdenes activas en este momento.</p></div></div>
