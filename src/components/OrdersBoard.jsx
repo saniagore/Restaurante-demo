@@ -93,7 +93,10 @@ function OrdersBoard() {
 
 function OrderCard({ order, column, updating, onStatusChange }) {
   const items = order.order_items || order.items || []
-  const deliveryLabel = order.order_type === 'delivery' ? 'Domicilio' : 'Recoger en local'
+  const isPickup = order.order_type !== 'delivery'
+  const deliveryLabel = isPickup ? 'Recoger en local' : 'Domicilio'
+  const nextStatus = isPickup && column.key === 'preparing' ? 'completed' : column.next
+  const nextAction = isPickup && column.key === 'preparing' ? 'Marcar listo para recoger' : column.action
   const [expanded, setExpanded] = useState(false)
   return <article className="order-card">
     <button className="order-card-summary" type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>
@@ -105,8 +108,8 @@ function OrderCard({ order, column, updating, onStatusChange }) {
       <div className="items-list">{items.map((item, index) => <div className="order-item" key={item.id || index}><span><b>{item.quantity || 1}×</b> {item.dishes?.nombre || item.name || item.dish_name || 'Producto'}{item.dishes?.descripcion && <small>{item.dishes.descripcion}</small>}</span><span>{money(item.subtotal || item.unit_price * (item.quantity || 1))}</span></div>)}</div>
       {(order.delivery_address || order.notes || order.customer_phone) && <div className="order-notes">{order.customer_phone && <><strong>Teléfono</strong><p>{order.customer_phone}</p></>}{order.delivery_address && <><strong>Dirección</strong><p>{order.delivery_address}</p></>}{order.notes && <><strong>Notas</strong><p>{order.notes}</p></>}</div>}
     </div>}
-    {column.next ? <button className="primary-button order-action" onClick={() => onStatusChange(order, column.next)} disabled={updating === order.id}>{updating === order.id ? 'Guardando...' : column.action} <span>→</span></button> : <span className="completed-label">Último estado</span>}
-    {['pending', 'accepted', 'preparing'].includes(order.status) && <button className="text-button order-cancel" disabled={updating === order.id} onClick={() => { if (window.confirm('¿Cancelar este pedido? Se liberará el teléfono del cliente.')) onStatusChange(order, 'cancelled') }}>Cancelar pedido</button>}
+    {nextStatus ? <button className="primary-button order-action" onClick={() => onStatusChange(order, nextStatus)} disabled={updating === order.id}>{updating === order.id ? 'Guardando...' : nextAction} <span>→</span></button> : <span className="completed-label">{isPickup ? 'Pedido listo' : 'Último estado'}</span>}
+    {['pending', 'accepted', 'preparing'].includes(column.key) && <button className="text-button order-cancel" disabled={updating === order.id} onClick={() => { if (window.confirm('¿Cancelar este pedido? Se liberará el teléfono del cliente.')) onStatusChange(order, 'cancelled') }}>Cancelar pedido</button>}
   </article>
 }
 
