@@ -19,6 +19,8 @@ Esta guía explica qué se implementó, qué datos faltan por completar y cómo 
 | Evidencia en base de datos | `supabase/migrations/20261115000000_order_consent.sql` | Columnas `legal_version` y `terms_accepted_at`; la RPC rechaza pedidos sin versión. |
 | Retención | `supabase/migrations/20261115010000_data_retention.sql` | Purga de IP cada hora y anonimización de pedidos completados. |
 | Aviso de privacidad corto | `src/App.tsx` (checkout) | Responsable, finalidad, derechos y canal, junto al campo de nombre. |
+| Pedido único y teléfono | `src/App.tsx`, `src/lib/customer-session.ts`, `supabase/migrations/20261116000000_add_phone_single_active_order.sql` | Teléfono obligatorio en recogida y domicilio; un solo pedido activo por teléfono y por navegador. |
+| Cancelación e historial | `src/components/OrdersBoard.jsx`, `supabase/migrations/20261116010000_cancel_orders_and_history.sql` | Estado `cancelled`, botón de cancelación, historial de estados y vencimiento de pedidos pendientes. |
 
 ## 2. Datos pendientes (marcadores en mayúsculas)
 
@@ -43,9 +45,21 @@ Mientras un correo o teléfono empiece por mayúsculas y no tenga formato válid
 
 1. Edita el texto en `src/legal/content.tsx`.
 2. Actualiza `LEGAL_VERSION` (formato `AAAA-MM-DD`) y `LEGAL_LAST_UPDATED` en `src/config/business.ts`.
-3. Haz commit y despliega.
+3. Registra la versión en Supabase y marca la anterior como no vigente:
 
-`LEGAL_VERSION` se envía en cada pedido y se guarda en `orders.legal_version`; también controla cuándo reaparece el aviso de almacenamiento. No cambies la versión sin cambiar el texto, ni al contrario.
+```sql
+insert into public.legal_versions (version, is_current)
+values ('2026-11-15', true)
+on conflict (version) do update set is_current = true;
+
+update public.legal_versions
+set is_current = false
+where version <> '2026-11-15';
+```
+
+4. Haz commit y despliega.
+
+`LEGAL_VERSION` se envía en cada pedido y se guarda en `orders.legal_version`; también controla cuándo reaparece el aviso de almacenamiento. La RPC solo acepta versiones que existan en `legal_versions` con `is_current = true`: si cambias el texto sin registrar la versión, los pedidos fallarán con `Invalid order payload`. No cambies la versión sin cambiar el texto, ni al contrario.
 
 ## 4. Migraciones
 
@@ -58,14 +72,18 @@ npx supabase db push
 
 Alternativa: copiar el contenido de cada archivo en el SQL Editor del panel de Supabase, respetando el orden.
 
-**Atajo:** [migraciones-completas.sql](migraciones-completas.sql) reúne en un solo archivo el esquema base mínimo, las 11 migraciones anteriores y estas 2, en orden y de forma idempotente. Es la opción recomendada si prefieres pegar una sola vez en el SQL Editor.
+**Atajo:** [migraciones-completas.sql](migraciones-completas.sql) reúne en un solo archivo el esquema base mínimo, las 11 migraciones anteriores y estas 4, en orden y de forma idempotente. Es la opción recomendada si prefieres pegar una sola vez en el SQL Editor.
 
 1. `20261115000000_order_consent.sql`: agrega columnas y actualiza `create_order_secure`.
 2. `20261115010000_data_retention.sql`: agrega `anonymized_at`, crea las funciones de limpieza y programa `pg_cron`.
+3. `20261116000000_add_phone_single_active_order.sql`: agrega teléfono, identificador de navegador, token de idempotencia, tope de ítems, validación de cantidades, versión legal y límite global.
+4. `20261116010000_cancel_orders_and_history.sql`: agrega el estado `cancelled`, el historial de estados y el vencimiento automático de pedidos pendientes.
 
 Notas:
 
-- El pedido se rechaza con el código `22023` si no incluye `legal_version` válida.
+- El pedido se rechaza con el código `22023` si no incluye teléfono válido, versión legal vigente, más de 50 ítems, platos duplicados o cantidades fuera de 1-99.
+- Si el teléfono o el navegador ya tienen un pedido activo, la RPC responde `Ya tienes un pedido activo` (código `P0001`) y no crea una fila.
+- El mismo `client_token` devuelve el pedido ya creado: reintentar no duplica.
 - `pg_cron` se intenta habilitar en la migración. Si no está disponible, actívalo en *Database → Extensions* y vuelve a ejecutar el bloque de programación, o usa el runbook manual de la sección 6.
 - Las funciones de limpieza no son ejecutables por `anon` ni por `authenticated`: solo por el rol propietario y por `pg_cron`.
 
@@ -77,28 +95,41 @@ select * from public.create_order_secure(
   '{"customer_name":"Prueba","order_type":"pickup","items":[]}'::jsonb
 );
 
--- 2) Con consentimiento debe crear el pedido y sellar la fecha
+-- 2) Pedido válido: reemplaza <UUID_DE_UN_PLATO> por un id real de dishes
 select * from public.create_order_secure(jsonb_build_object(
   'customer_name', 'Prueba',
+  'customer_phone', '3001234567',
   'order_type', 'pickup',
   'notes', '',
   'legal_version', '2026-11-15',
+  'client_id', '11111111-1111-4111-8111-111111111111',
+  'client_token', '22222222-2222-4222-8222-222222222222',
   'items', jsonb_build_array(jsonb_build_object('dish_id', '<UUID_DE_UN_PLATO>', 'quantity', 1))
 ));
 
-select id, legal_version, terms_accepted_at
+-- 3) Repetir el mismo client_token devuelve el mismo pedido (idempotencia)
+-- 4) Otro pedido con el mismo teléfono o client_id debe fallar:
+--    "Ya tienes un pedido activo"
+
+select id, customer_phone, legal_version, terms_accepted_at
 from public.orders
 order by created_at desc
 limit 1;
 
--- 3) Limpieza de IP (devuelve filas eliminadas)
-select public.purge_order_rate_limits();
+-- 5) Cancelar el pedido de prueba libera el teléfono
+update public.orders set status = 'cancelled' where id = '<ID_DEL_PEDIDO_DE_PRUEBA>';
+select from_status, to_status, changed_at from public.order_status_history
+where order_id = '<ID_DEL_PEDIDO_DE_PRUEBA>';
 
--- 4) Anonimización de pedidos completados antiguos (devuelve filas afectadas)
+-- 6) Limpieza de IP y vencimiento de pendientes
+select public.purge_order_rate_limits();
+select public.expire_stale_orders();
+
+-- 7) Anonimización de pedidos completados o cancelados antiguos
 select public.anonymize_completed_orders(interval '12 months');
 ```
 
-El pedido de prueba consume el límite de 5 por minuto por IP; bórralo después:
+El pedido de prueba consume el límite de 5 por minuto por IP; bórralo después (el historial se borra en cascada):
 
 ```sql
 delete from public.order_items where order_id = '<ID_DEL_PEDIDO_DE_PRUEBA>';
@@ -107,7 +138,7 @@ delete from public.orders where id = '<ID_DEL_PEDIDO_DE_PRUEBA>';
 
 ## 6. Retención de datos
 
-- **Pedidos:** 12 meses desde su creación; después se anonimizan (nombre, dirección y notas). Los valores, fechas y estados se conservan para estadística y contabilidad.
+- **Pedidos:** 12 meses desde su creación; después se anonimizan (nombre, teléfono, dirección, notas e identificador del navegador). Los valores, fechas y estados se conservan para estadística y contabilidad.
 - **IP de control de pedidos:** máximo 1 hora.
 - **PQRS:** 24 meses.
 
@@ -128,18 +159,18 @@ y en `src/config/business.ts`:
 retention: { ordersMonths: 6, rateLimitHours: 1, pqrsMonths: 24 }
 ```
 
-La anonimización solo toca pedidos con estado `completed`; un pedido en curso o con reclamo abierto nunca se anonimiza.
+La anonimización solo toca pedidos `completed` o `cancelled`; un pedido en curso o con reclamo abierto nunca se anonimiza. Los pedidos pendientes con más de 2 horas se cancelan automáticamente cada 15 minutos para no bloquear el teléfono del cliente.
 
 ## 7. Privacidad por diseño: terceros eliminados
 
 - El hero ya no descarga la imagen desde Unsplash: usa `src/assets/hero.png`.
 - Se eliminó la importación de Google Fonts (`src/index.css`); ahora se usan tipografías del sistema. Si quieres recuperar la identidad visual, autoaloja los archivos `.woff2` en `public/fonts` y declara `@font-face` (así no se envía la IP del visitante a Google).
 - Las imágenes del menú se sirven desde `/dmonkey-*.png`; si el administrador pega una URL externa en el gestor de menú, la imagen se carga con `referrerPolicy="no-referrer"`. Documenta ese caso si empiezas a usar un CDN externo.
-- `vercel.json` agrega `Referrer-Policy`, `X-Content-Type-Options` y `X-Frame-Options`.
+- `vercel.json` agrega `Referrer-Policy`, `X-Content-Type-Options`, `X-Frame-Options` y una `Content-Security-Policy` que solo permite scripts propios y conexiones a Supabase.
 
 ## 8. Pendientes y decisiones abiertas
 
-- **Estado `cancelled`:** el enum `order_status` no lo tiene y el tablero solo avanza estados. La política de cancelación describe el proceso por canales de atención, pero conviene agregar el estado y un botón de cancelación en `/admin`. Queda como fase 8.
+- **Teléfono sin verificación:** se pide el número en recogida y domicilio, pero no se envían códigos. La regla de un pedido activo por teléfono y por navegador es una barrera operativa: alguien puede evadirla con otro número u otro navegador. Si más adelante se necesita garantía de identidad, habría que agregar verificación por SMS (hoy fuera de alcance).
 - **Consentimiento específico de datos sensibles:** la Política indica que escribir alergias constituye autorización expresa y que es opcional. Si el abogado lo exige, agrega una segunda casilla independiente en el checkout.
 - **Régimen tributario:** los textos declaran precios finales al consumidor con "todos los impuestos y costos aplicables", sin especificar INC ni IVA. Si el contador confirma el INC del 8 %, actualiza `priceNotice` en `src/config/business.ts` para nombrarlo.
 - **Registro Nacional de Bases de Datos (RNBD):** aplica a responsables con activos superiores a 100.000 UVT; verifica si tu caso está obligado.
@@ -151,9 +182,11 @@ La anonimización solo toca pedidos con estado `completed`; un pedido en curso o
 - [ ] Completar los datos de la sección 2 y actualizar `LEGAL_VERSION` si cambia el texto.
 - [ ] Revisión de los cuatro documentos por un abogado.
 - [ ] Revisión de precios e impuestos por el contador (hoy se declaran como precios finales con impuestos incluidos).
-- [ ] Aplicar las dos migraciones y ejecutar la verificación de la sección 5.
+- [ ] Aplicar las cuatro migraciones (o el archivo único) y ejecutar la verificación de la sección 5.
+- [ ] Probar que un segundo pedido con el mismo teléfono o navegador se rechace y que cancelar lo libere.
 - [ ] Confirmar que los buzones `pqrsEmail` y `privacyEmail` existen y tienen responsable asignado.
 - [ ] Probar en producción: carrito → consentimiento sin marcar (debe bloquear) → pedido → seguimiento.
+- [ ] Verificar que la CSP no bloquee Supabase (REST, Realtime del panel) ni las imágenes del menú.
 - [ ] Probar `/terminos`, `/privacidad`, `/cookies`, `/pqrs` en escritorio y móvil.
 - [ ] Verificar el flujo de cancelación y reembolso descrito en los Términos.
 - [ ] Programar una revisión semestral de los documentos y de los plazos de retención.

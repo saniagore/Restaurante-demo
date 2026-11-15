@@ -88,8 +88,9 @@ const terminos: LegalDoc = {
       id: 'pedidos',
       title: '5. Realización y confirmación del pedido',
       body: <>
-        <p>Para hacer un pedido debes elegir los productos, indicar tu nombre y, si aplica, la dirección de entrega, y confirmar el total. Al finalizar recibirás un código de seguimiento para consultar el estado.</p>
-        <p>Eres responsable de la exactitud de los datos que proporcionas, especialmente la dirección y las referencias de entrega. Si los datos son incorrectos o incompletos, el pedido puede retrasarse o no poder entregarse.</p>
+        <p>Para hacer un pedido debes elegir los productos, indicar tu nombre, un teléfono de contacto y, si aplica, la dirección de entrega, y confirmar el total. Al finalizar recibirás un código de seguimiento para consultar el estado. No enviamos códigos de verificación al teléfono.</p>
+        <p>Eres responsable de la exactitud de los datos que proporcionas, especialmente el teléfono, la dirección y las referencias de entrega. Si los datos son incorrectos o incompletos, el pedido puede retrasarse o no poder entregarse.</p>
+        <p>Mientras tengas un pedido activo (pendiente, aceptado, en preparación o en camino), no podrás crear otro con el mismo teléfono o desde el mismo navegador. Si el pedido se completa o se cancela, podrás volver a pedir.</p>
         <p>El restaurante puede rechazar un pedido por falta de cobertura, por imposibilidad de contacto o por indicios razonables de uso fraudulento. En esos casos no se cobrará el pedido.</p>
       </>,
     },
@@ -187,7 +188,8 @@ const privacidad: LegalDoc = {
       title: '3. Datos que tratamos',
       body: <>
         <ul>
-          <li><strong>Identificación y contacto del cliente:</strong> nombre y, si los suministras, teléfono o correo electrónico.</li>
+          <li><strong>Identificación y contacto del cliente:</strong> nombre y teléfono. El teléfono es obligatorio para coordinar la entrega; no enviamos códigos de verificación.</li>
+          <li><strong>Identificador del navegador:</strong> un número aleatorio que se guarda en tu navegador para evitar que se creen pedidos duplicados.</li>
           <li><strong>Datos de entrega:</strong> dirección física, barrio y referencias, únicamente cuando el pedido es a domicilio.</li>
           <li><strong>Notas del pedido:</strong> indicaciones de preparación, incluidas alergias o condiciones de salud. Son datos sensibles y su suministro es opcional.</li>
           <li><strong>Datos del pedido:</strong> productos, cantidades, valores, tipo de entrega y estado.</li>
@@ -238,7 +240,7 @@ const privacidad: LegalDoc = {
         <ul>
           <li><strong>Supabase Inc.</strong> (base de datos PostgreSQL alojada en Amazon Web Services) para almacenar pedidos y el menú.</li>
           <li><strong>Vercel Inc.</strong> para el alojamiento del sitio web.</li>
-          <li><strong>Personal de cocina y repartidores:</strong> reciben nombre, dirección, indicaciones del pedido y valor a cobrar, exclusivamente para preparar y entregar.</li>
+          <li><strong>Personal de cocina y repartidores:</strong> reciben nombre, teléfono, dirección, indicaciones del pedido y valor a cobrar, exclusivamente para preparar y entregar.</li>
         </ul>
         <p>Estos proveedores pueden almacenar y procesar datos fuera de Colombia, principalmente en Estados Unidos. Al aceptar esta política autorizas esa transferencia internacional en los términos de la Ley 1581 de 2012 y del Decreto 1377 de 2013.</p>
         <p>No compartimos datos con terceros para fines publicitarios ni cedemos bases de datos a otras empresas.</p>
@@ -248,7 +250,7 @@ const privacidad: LegalDoc = {
       id: 'conservacion',
       title: '8. Conservación y anonimización',
       body: <>
-        <p>Conservamos los datos de los pedidos durante {business.retention.ordersMonths} meses desde su entrega. Después de ese plazo, el nombre, la dirección y las notas se eliminan de forma automática (anonimización); se conservan únicamente valores, fechas y estado, con fines estadísticos y de cumplimiento contable.</p>
+        <p>Conservamos los datos de los pedidos durante {business.retention.ordersMonths} meses desde su entrega. Después de ese plazo, el nombre, el teléfono, la dirección, las notas y el identificador del navegador se eliminan de forma automática (anonimización); se conservan únicamente valores, fechas y estado, con fines estadísticos y de cumplimiento contable.</p>
         <p>La dirección IP asociada al control de pedidos se elimina después de {business.retention.rateLimitHours} hora(s). Los datos de PQRS se conservan hasta por {business.retention.pqrsMonths} meses.</p>
         <p>Puedes solicitar la supresión anticipada de tus datos; atenderemos la solicitud salvo que exista un deber legal o contractual de conservarlos.</p>
       </>,
@@ -312,10 +314,12 @@ const cookies: LegalDoc = {
           <tbody>
             <tr><td><code>restaurant-cart</code></td><td>Guarda el carrito de compras (productos y cantidades) para que no se pierda al recargar la página.</td><td>Hasta confirmar el pedido o borrar los datos del navegador.</td></tr>
             <tr><td><code>storage-notice-ack</code></td><td>Recuerda que ya viste este aviso para no mostrarlo nuevamente.</td><td>Hasta que cambie la versión de este aviso o borres los datos.</td></tr>
+            <tr><td><code>restaurant-client-id</code></td><td>Identificador aleatorio del navegador para evitar que se creen pedidos duplicados.</td><td>Hasta que borres los datos del navegador.</td></tr>
+            <tr><td><code>restaurant-last-order</code></td><td>Código del último pedido para mostrarte el acceso al seguimiento.</td><td>Hasta completar o cancelar el pedido, o borrar los datos.</td></tr>
             <tr><td><code>sb-&lt;proyecto&gt;-auth-token</code></td><td>Sesión del panel administrativo. Solo aplica al personal autorizado del restaurante, no a los clientes.</td><td>Hasta cerrar sesión o hasta que expire la sesión.</td></tr>
           </tbody>
         </table>
-        <p>El carrito contiene únicamente identificadores de platos y cantidades; no incluye tu nombre ni tu dirección. Los datos personales se envían al restaurante solo cuando confirmas el pedido.</p>
+        <p>El carrito contiene únicamente identificadores de platos y cantidades; no incluye tu nombre ni tu dirección. El identificador del navegador es un número aleatorio que no revela datos personales. Los datos personales se envían al restaurante solo cuando confirmas el pedido.</p>
       </>,
     },
     {

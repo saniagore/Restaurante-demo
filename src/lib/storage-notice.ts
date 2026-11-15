@@ -1,4 +1,5 @@
 import { CART_STORAGE_KEY } from './cart'
+import { CLIENT_ID_KEY, LAST_ORDER_KEY } from './customer-session'
 import { LEGAL_VERSION } from '../config/business'
 
 export const STORAGE_NOTICE_KEY = 'storage-notice-ack'
@@ -39,15 +40,16 @@ export function acceptStorageNotice(storage?: KeyValueStorage | null): boolean {
   }
 }
 
-/** Elimina del navegador el carrito, el acuse del aviso y las sesiones de Supabase. */
+/** Elimina del navegador el carrito, el acuse, el identificador y las sesiones de Supabase. */
 export function clearStoredBrowserData(storage?: KeyValueStorage | null): string[] {
   const store = resolveStorage(storage)
   if (!store) return []
   try {
+    const removable = [CART_STORAGE_KEY, STORAGE_NOTICE_KEY, CLIENT_ID_KEY, LAST_ORDER_KEY]
     const keys: string[] = []
     for (let index = 0; index < store.length; index += 1) {
       const key = store.key(index)
-      if (key && (key === CART_STORAGE_KEY || key === STORAGE_NOTICE_KEY || AUTH_TOKEN_PATTERN.test(key))) {
+      if (key && (removable.includes(key) || AUTH_TOKEN_PATTERN.test(key))) {
         keys.push(key)
       }
     }

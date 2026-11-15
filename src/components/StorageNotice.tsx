@@ -27,8 +27,8 @@ export function StorageNotice({ onOpenDetails, onClear }: StorageNoticeProps) {
     <div className="storage-notice-copy">
       <strong>Guardamos datos en tu navegador</strong>
       <p>
-        Usamos almacenamiento local para conservar tu carrito y, si eres del equipo, la sesión del panel.
-        No usamos cookies de publicidad ni analítica.
+        Usamos almacenamiento local para conservar tu carrito, un identificador que evita pedidos duplicados
+        y, si eres del equipo, la sesión del panel. No usamos cookies de publicidad ni analítica.
         {cleared ? ' Listo: borramos los datos guardados en este navegador.' : ''}
       </p>
       <button type="button" className="legal-link" onClick={onOpenDetails}>Más información</button>

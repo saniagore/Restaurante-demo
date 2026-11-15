@@ -93,3 +93,6 @@
   .storage-notice-actions { width: 100%; }
   .storage-notice-actions button { flex: 1; }
 }
+
+.active-order-banner { max-width: 1160px; margin: 18px auto 0; padding: 12px 18px; border: 1px solid #f1d1c7; background: #fffaf8; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; font-size: 12px; color: var(--ink); }
+.active-order-banner .legal-link { margin-top: 0; font-weight: 600; }

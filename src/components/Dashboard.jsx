@@ -6,7 +6,7 @@ const formatTime = (value) => new Date(value).toLocaleTimeString('es-CO', { hour
 const todayKey = () => new Date().toLocaleDateString('en-CA')
 const orderTotal = (order) => Number(order.total_amount ?? order.total ?? 0)
 const uniqueOrders = (orders) => Array.from(new Map(orders.map((order) => [order.id, order])).values())
-const activeStatuses = new Set(['pending', 'accepted', 'preparing', 'on_the_way', 'completed'])
+const activeStatuses = new Set(['pending', 'accepted', 'preparing', 'on_the_way', 'completed', 'cancelled'])
 
 function Dashboard({ onOpenOrders }) {
   const [orders, setOrders] = useState([])
@@ -19,7 +19,7 @@ function Dashboard({ onOpenOrders }) {
       .from('orders')
       .select('id,status,customer_name,order_type,total,created_at')
       .order('created_at', { ascending: false })
-    if (queryError) setError(`No se pudo cargar el resumen: ${queryError.message}`)
+    if (queryError) { console.error('No se pudo cargar el resumen', queryError); setError('No se pudo cargar el resumen. Intenta de nuevo.') }
     else setOrders(uniqueOrders(data || []))
     setLoading(false)
   }, [])

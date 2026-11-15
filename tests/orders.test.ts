@@ -6,21 +6,27 @@ const item = { id: '11111111-1111-4111-8111-111111111111', name: 'Arroz', descri
 
 const details = {
   customerName: 'Ana',
+  phone: '300 123 4567',
   orderType: 'pickup',
   notes: '',
   deliveryAddress: '',
   acceptedTerms: true,
+  clientId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  clientToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
 }
 
 describe('secure checkout payload', () => {
-  it('keeps only server-priced item ids and strips markup from notes', () => {
+  it('keeps only server-priced item ids, normalizes the phone and strips markup from notes', () => {
     const payload = createCheckoutPayload(buildCheckoutInput([item], { ...details, notes: '<img src=x onerror=alert(1)> sin cebolla' }))
     expect(payload).toEqual({
       customer_name: 'Ana',
+      customer_phone: '3001234567',
       order_type: 'pickup',
       delivery_address: null,
       notes: ' sin cebolla',
       legal_version: LEGAL_VERSION,
+      client_id: details.clientId,
+      client_token: details.clientToken,
       items: [{ dish_id: item.id, quantity: 2 }],
     })
     expect(payload).not.toHaveProperty('total')
@@ -38,6 +44,16 @@ describe('secure checkout payload', () => {
       delivery_address: 'Calle 10 #20-30',
     })
     expect(() => createCheckoutPayload(buildCheckoutInput([item], { ...details, orderType: 'delivery' }))).toThrow()
+  })
+
+  it('requires a phone with 7 to 15 digits and normalizes the +57 prefix', () => {
+    expect(() => createCheckoutPayload(buildCheckoutInput([item], { ...details, phone: '12345' }))).toThrow(/teléfono/i)
+    expect(createCheckoutPayload(buildCheckoutInput([item], { ...details, phone: '+57 (300) 123-4567' })).customer_phone).toBe('3001234567')
+  })
+
+  it('rejects more than 50 items on the client as a first barrier', () => {
+    const many = Array.from({ length: 51 }, () => item)
+    expect(() => createCheckoutPayload(buildCheckoutInput(many, details))).toThrow()
   })
 
   it('requires the terms and privacy acceptance', () => {

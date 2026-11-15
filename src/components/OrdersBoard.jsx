@@ -7,6 +7,7 @@ const columns = [
   { key: 'preparing', label: 'Preparando', icon: '◌', next: 'on_the_way', action: 'Marcar en camino' },
   { key: 'on_the_way', label: 'En camino', icon: '⌁', next: 'completed', action: 'Marcar completado' },
   { key: 'completed', label: 'Completadas', icon: '✓', next: null, action: 'Pedido completado' },
+  { key: 'cancelled', label: 'Canceladas', icon: '×', next: null, action: 'Pedido cancelado' },
 ]
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`
@@ -18,7 +19,7 @@ function OrdersBoard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updating, setUpdating] = useState(null)
-  const [collapsedColumns, setCollapsedColumns] = useState({ completed: true })
+  const [collapsedColumns, setCollapsedColumns] = useState({ completed: true, cancelled: true })
   const loadOrders = useCallback(async () => {
     setLoading(true)
     const { data, error: queryError } = await supabase
@@ -51,7 +52,10 @@ function OrdersBoard() {
   async function updateStatus(order, status) {
     setUpdating(order.id)
     const { error: updateError } = await supabase.from('orders').update({ status }).eq('id', order.id)
-    if (updateError) setError(`No se pudo actualizar la orden: ${updateError.message}`)
+    if (updateError) {
+      console.error('No se pudo actualizar la orden', updateError)
+      setError('No se pudo actualizar el pedido. Intenta de nuevo.')
+    }
     setUpdating(null)
   }
 
@@ -99,9 +103,10 @@ function OrderCard({ order, column, updating, onStatusChange }) {
     </button>
     {expanded && <div className="order-details">
       <div className="items-list">{items.map((item, index) => <div className="order-item" key={item.id || index}><span><b>{item.quantity || 1}×</b> {item.dishes?.nombre || item.name || item.dish_name || 'Producto'}{item.dishes?.descripcion && <small>{item.dishes.descripcion}</small>}</span><span>{money(item.subtotal || item.unit_price * (item.quantity || 1))}</span></div>)}</div>
-      {(order.delivery_address || order.notes) && <div className="order-notes">{order.delivery_address && <><strong>Dirección</strong><p>{order.delivery_address}</p></>}{order.notes && <><strong>Notas</strong><p>{order.notes}</p></>}</div>}
+      {(order.delivery_address || order.notes || order.customer_phone) && <div className="order-notes">{order.customer_phone && <><strong>Teléfono</strong><p>{order.customer_phone}</p></>}{order.delivery_address && <><strong>Dirección</strong><p>{order.delivery_address}</p></>}{order.notes && <><strong>Notas</strong><p>{order.notes}</p></>}</div>}
     </div>}
     {column.next ? <button className="primary-button order-action" onClick={() => onStatusChange(order, column.next)} disabled={updating === order.id}>{updating === order.id ? 'Guardando...' : column.action} <span>→</span></button> : <span className="completed-label">Último estado</span>}
+    {['pending', 'accepted', 'preparing'].includes(order.status) && <button className="text-button order-cancel" disabled={updating === order.id} onClick={() => { if (window.confirm('¿Cancelar este pedido? Se liberará el teléfono del cliente.')) onStatusChange(order, 'cancelled') }}>Cancelar pedido</button>}
   </article>
 }
 

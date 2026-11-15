@@ -57,13 +57,23 @@ describe('clearStoredBrowserData', () => {
     const storage = createStorage({
       'restaurant-cart': '{"state":{"items":[]}}',
       ...currentVersion,
+      'restaurant-client-id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'restaurant-last-order': 'abc123',
       'sb-project-auth-token': '{"access_token":"x"}',
       'unrelated-key': 'keep me',
     })
     const removed = clearStoredBrowserData(storage)
-    expect(removed.sort()).toEqual(['restaurant-cart', 'sb-project-auth-token', STORAGE_NOTICE_KEY].sort())
+    expect(removed.sort()).toEqual([
+      'restaurant-cart',
+      'restaurant-client-id',
+      'restaurant-last-order',
+      'sb-project-auth-token',
+      STORAGE_NOTICE_KEY,
+    ].sort())
     expect(storage.getItem('unrelated-key')).toBe('keep me')
     expect(storage.getItem('restaurant-cart')).toBeNull()
+    expect(storage.getItem('restaurant-client-id')).toBeNull()
+    expect(storage.getItem('restaurant-last-order')).toBeNull()
     expect(storage.getItem(STORAGE_NOTICE_KEY)).toBeNull()
     expect(storage.getItem('sb-project-auth-token')).toBeNull()
   })
