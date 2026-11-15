@@ -3,8 +3,10 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { useCart, type CartItem, type Dish } from './lib/cart'
 import { buildCheckoutInput, createCheckoutPayload } from './lib/orders'
 import { allergensNotice, business, LEGAL_VERSION } from './config/business'
+import { ActiveOrderBanner } from './components/ActiveOrderBanner'
 import { SiteFooter } from './components/SiteFooter'
 import { StorageNotice } from './components/StorageNotice'
+import { clearRememberedOrderToken, createId, getClientId, getRememberedOrderToken, rememberOrderToken } from './lib/customer-session'
 import { isLegalSlug, type LegalDocSlug } from './legal/content'
 import { LegalPage } from './legal/LegalPage'
 import { LegalModal } from './legal/LegalModal'
@@ -86,6 +88,7 @@ function MenuPage({ navigate }: { navigate: (to: string) => void }) {
   })
   return <div className="app-shell">
     <header className="topbar"><a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/') }}><span className="brand-mark">M</span><span>{business.brand}<small>{business.tagline}</small></span></a><nav><a href="#menu">Menú</a><a href="#about">El restaurante</a></nav><button className="cart-button" onClick={() => setCartOpen(true)} aria-label="Abrir carrito"><Icon name="bag" /><span>Tu pedido</span>{items.length > 0 && <b>{items.reduce((sum, item) => sum + item.quantity, 0)}</b>}</button></header>
+    <ActiveOrderBanner onOpen={(token) => navigate(`/track/${token}`)} />
     <main>
       <section className="hero-section"><div className="hero-copy"><p className="eyebrow">SABORES PARA COMPARTIR</p><h1>Un buen momento<br /><em>empieza en la mesa.</em></h1><p className="hero-description">Ingredientes frescos, recetas hechas con cuidado y opciones para disfrutar a tu manera.</p><a className="gold-button" href="#menu">Explorar el menú <Icon name="arrow" size={16} /></a></div><div className="hero-art"><img src={heroImage} alt="Plato preparado para compartir" /></div></section>
       <section id="menu" className="menu-section"><div className="section-heading"><div><p className="eyebrow">NUESTRO MENÚ</p><h2>Elige algo delicioso</h2></div><label className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el menú" aria-label="Buscar en el menú" /></label></div>
@@ -125,6 +128,9 @@ export function Checkout({ close, navigate, onBack }: { close: () => void; navig
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [notes, setNotes] = useState('')
+  const [phone, setPhone] = useState('')
+  const [clientId] = useState(() => getClientId())
+  const [clientToken] = useState(() => createId())
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [legalDoc, setLegalDoc] = useState<LegalDocSlug | null>(null)
   const [error, setError] = useState('')
@@ -140,11 +146,14 @@ export function Checkout({ close, navigate, onBack }: { close: () => void; navig
     try {
       const payload = createCheckoutPayload(buildCheckoutInput(items, {
         customerName: name,
+        phone,
         orderType,
         notes,
         deliveryAddress,
         acceptedTerms,
         legalVersion: LEGAL_VERSION,
+        clientId,
+        clientToken,
       }))
       let token = `demo-${Date.now().toString(36)}`
       if (supabase) {
@@ -154,15 +163,16 @@ export function Checkout({ close, navigate, onBack }: { close: () => void; navig
           if (!createdOrder) throw new Error('No se pudo crear la orden')
           token = createdOrder.track_token
       }
-      clearCart(); close(); navigate(`/track/${token}`)
+      rememberOrderToken(token); clearCart(); close(); navigate(`/track/${token}`)
     } catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'No pudimos enviar tu pedido. Intenta de nuevo.'); setSaving(false) }
   }
+  const rememberedOrderToken = getRememberedOrderToken()
   const openLegal = (slug: LegalDocSlug) => (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()
     event.stopPropagation()
     setLegalDoc(slug)
   }
-  return <form className="checkout-form" onSubmit={submit}><button type="button" className="back-link" onClick={onBack}><Icon name="back" size={16} /> Volver al pedido</button><label>¿Cómo quieres recibirlo?<div className="radio-group"><button type="button" className={orderType === 'pickup' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('pickup')}><span>Recoger</span><small>Listo en el local</small><i /></button><button type="button" className={orderType === 'delivery' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('delivery')}><span>Domicilio</span><small>Te lo llevamos</small><i /></button></div></label><label>Tu nombre<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="¿Cómo te llamamos?" /></label><p className="field-hint">Responsable: {business.legalName}. Tratamos tu nombre, dirección y notas para gestionar el pedido y la entrega. Puedes conocer, actualizar, rectificar o suprimir tus datos escribiendo a {business.privacyEmail}. <a href="/privacidad" onClick={openLegal('privacidad')}>Política completa</a>.</p>{orderType === 'delivery' && <label>Dirección de entrega<input required value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Calle, número, barrio y referencias" /></label>}<label>Notas para cocina <span className="optional">Opcional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Alergias, indicaciones..." rows={3} /></label><p className="field-hint">{allergensNotice} <a href="/privacidad" onClick={openLegal('privacidad')}>Ver tratamiento de datos sensibles</a>.</p><div className="payment-note"><span>Forma de pago</span><strong>💵 Efectivo</strong></div><div className="checkout-total"><span>Subtotal</span><strong>{money.format(total)}</strong>{orderType === 'delivery' && <><span>Domicilio</span><strong>{money.format(deliveryFee)}</strong></>}<span>Total</span><strong>{money.format(checkoutTotal)}</strong></div><p className="cart-tax-note">Precios finales en pesos colombianos (COP), con impuestos y costos incluidos.</p><div className="consent-field"><input id="accept-terms" type="checkbox" checked={acceptedTerms} aria-required="true" onChange={(event) => setAcceptedTerms(event.target.checked)} /><label className="consent-label" htmlFor="accept-terms">He leído y acepto los <a href="/terminos" onClick={openLegal('terminos')}>Términos y Condiciones</a> y la <a href="/privacidad" onClick={openLegal('privacidad')}>Política de Tratamiento de Datos Personales</a>. <span className="optional">Obligatorio</span></label></div>{error && <p className="form-error" role="alert">{error}</p>}<button disabled={saving} className="primary-button" type="submit">{saving ? 'Enviando...' : `Confirmar pedido · ${money.format(checkoutTotal)}`} {!saving && <Icon name="arrow" size={17} />}</button>{legalDoc && <LegalModal slug={legalDoc} onClose={() => setLegalDoc(null)} />}</form>
+  return <form className="checkout-form" onSubmit={submit}><button type="button" className="back-link" onClick={onBack}><Icon name="back" size={16} /> Volver al pedido</button><label>¿Cómo quieres recibirlo?<div className="radio-group"><button type="button" className={orderType === 'pickup' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('pickup')}><span>Recoger</span><small>Listo en el local</small><i /></button><button type="button" className={orderType === 'delivery' ? 'radio-card selected' : 'radio-card'} onClick={() => setOrderType('delivery')}><span>Domicilio</span><small>Te lo llevamos</small><i /></button></div></label><label>Tu nombre<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="¿Cómo te llamamos?" /></label><label>Teléfono de contacto<input required type="tel" inputMode="tel" autoComplete="tel" maxLength={20} value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="300 123 4567" /></label><p className="field-hint">Solo lo usamos para coordinar este pedido. No enviamos códigos de verificación.</p><p className="field-hint">Responsable: {business.legalName}. Tratamos tu nombre, teléfono, dirección y notas para gestionar el pedido y la entrega. Puedes conocer, actualizar, rectificar o suprimir tus datos escribiendo a {business.privacyEmail}. <a href="/privacidad" onClick={openLegal('privacidad')}>Política completa</a>.</p>{orderType === 'delivery' && <label>Dirección de entrega<input required value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} placeholder="Calle, número, barrio y referencias" /></label>}<label>Notas para cocina <span className="optional">Opcional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Alergias, indicaciones..." rows={3} /></label><p className="field-hint">{allergensNotice} <a href="/privacidad" onClick={openLegal('privacidad')}>Ver tratamiento de datos sensibles</a>.</p><div className="payment-note"><span>Forma de pago</span><strong>💵 Efectivo</strong></div><div className="checkout-total"><span>Subtotal</span><strong>{money.format(total)}</strong>{orderType === 'delivery' && <><span>Domicilio</span><strong>{money.format(deliveryFee)}</strong></>}<span>Total</span><strong>{money.format(checkoutTotal)}</strong></div><p className="cart-tax-note">Precios finales en pesos colombianos (COP), con impuestos y costos incluidos.</p><div className="consent-field"><input id="accept-terms" type="checkbox" checked={acceptedTerms} aria-required="true" onChange={(event) => setAcceptedTerms(event.target.checked)} /><label className="consent-label" htmlFor="accept-terms">He leído y acepto los <a href="/terminos" onClick={openLegal('terminos')}>Términos y Condiciones</a> y la <a href="/privacidad" onClick={openLegal('privacidad')}>Política de Tratamiento de Datos Personales</a>. <span className="optional">Obligatorio</span></label></div>{error && <p className="form-error" role="alert">{error}</p>}{error && rememberedOrderToken && <p className="field-hint"><a href={`/track/${rememberedOrderToken}`} onClick={(event) => { event.preventDefault(); navigate(`/track/${rememberedOrderToken}`) }}>Ver mi pedido en curso</a></p>}<button disabled={saving} className="primary-button" type="submit">{saving ? 'Enviando...' : `Confirmar pedido · ${money.format(checkoutTotal)}`} {!saving && <Icon name="arrow" size={17} />}</button>{legalDoc && <LegalModal slug={legalDoc} onClose={() => setLegalDoc(null)} />}</form>
 }
 
 function TrackingPage({ token, navigate }: { token: string; navigate: (to: string) => void }) {
@@ -171,21 +181,25 @@ function TrackingPage({ token, navigate }: { token: string; navigate: (to: strin
   const [error, setError] = useState('')
   useEffect(() => {
     if (!supabase) { setOrder({ id: 'demo', track_token: token, status: 'preparing', customer_name: 'amigo', order_type: 'pickup', total: 32.4 }); setLoading(false); return }
-    let channel: ReturnType<typeof supabase.channel> | undefined
+    let active = true
     const load = async () => {
       const { data: orders, error: loadError } = await supabase.rpc('get_order_by_token', { p_token: token })
+      if (!active) return
       const data = orders?.[0]
-      if (loadError || !data) setError('No encontramos una orden con este código.')
-      else { setOrder(data as Order); channel = supabase.channel(`order-${data.id}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${data.id}` }, (payload) => setOrder(payload.new as Order)).subscribe() }
+      if (loadError || !data) { setError('No encontramos una orden con este código.'); setLoading(false); return }
+      setOrder(data as Order)
       setLoading(false)
+      if (data.status === 'completed' || data.status === 'cancelled') clearRememberedOrderToken()
     }
     load()
-    return () => { if (channel) supabase.removeChannel(channel) }
+    const timer = window.setInterval(load, 20000)
+    return () => { active = false; window.clearInterval(timer) }
   }, [token])
   const statuses = ['pending', 'accepted', 'preparing', 'on_the_way', 'completed']
   const current = Math.max(0, statuses.indexOf(order?.status || 'pending'))
+  const isCancelled = order?.status === 'cancelled'
   const labels = ['Pendiente', 'Aceptado', 'Preparando', 'En camino', 'Completado']
-  return <div className="tracking-page"><header className="topbar"><a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/') }}><span className="brand-mark">M</span><span>{business.brand}<small>{business.tagline}</small></span></a><a className="back-link page-back" href="/" onClick={(event) => { event.preventDefault(); navigate('/') }}><Icon name="back" size={16} /> Volver al menú</a></header><main className="tracking-main">{loading ? <div className="loading">Buscando tu pedido...</div> : error ? <div className="tracking-message"><div className="empty-icon"><Icon name="clock" size={28} /></div><h1>Pedido no encontrado</h1><p>{error}</p><button className="primary-button compact" onClick={() => navigate('/')}>Volver al menú</button></div> : order && <><div className="tracking-intro"><p className="eyebrow">PEDIDO #{token.slice(-6).toUpperCase()}</p><h1>¡Gracias, {order.customer_name}!</h1><p>Te avisaremos cuando tu pedido avance.</p></div><section className="status-card"><div className="status-top"><div><p className="eyebrow">ESTADO ACTUAL</p><h2>{labels[current]}</h2></div><span className="live-dot"><i /> En vivo</span></div><div className="timeline">{labels.map((label, index) => <div className={`timeline-step ${index <= current ? 'active' : ''} ${index === current ? 'current' : ''}`} key={label}><div className="step-dot">{index < current ? <Icon name="check" size={14} /> : index + 1}</div><span>{label}</span>{index < labels.length - 1 && <div className="step-line" />}</div>)}</div><div className="status-foot"><Icon name={current >= 4 ? 'check' : 'clock'} size={18} /><span>{current >= 4 ? 'Pedido' : 'Tiempo estimado'} <strong>{current >= 4 ? 'completado' : current >= 3 ? '¡Ya casi!' : business.deliveryEstimate}</strong></span></div></section><section className="order-detail"><div><p className="eyebrow">RESUMEN</p><h2>Tu pedido</h2></div><p>{order.order_type === 'delivery' ? 'Domicilio' : 'Recoger en el local'} · Pago en efectivo</p><strong>{order.total ? money.format(order.total) : 'Total confirmado en caja'}</strong></section></>}</main><SiteFooter onNavigate={navigate} /></div>
+  return <div className="tracking-page"><header className="topbar"><a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/') }}><span className="brand-mark">M</span><span>{business.brand}<small>{business.tagline}</small></span></a><a className="back-link page-back" href="/" onClick={(event) => { event.preventDefault(); navigate('/') }}><Icon name="back" size={16} /> Volver al menú</a></header><main className="tracking-main">{loading ? <div className="loading">Buscando tu pedido...</div> : error ? <div className="tracking-message"><div className="empty-icon"><Icon name="clock" size={28} /></div><h1>Pedido no encontrado</h1><p>{error}</p><button className="primary-button compact" onClick={() => navigate('/')}>Volver al menú</button></div> : order && <><div className="tracking-intro"><p className="eyebrow">PEDIDO #{token.slice(-6).toUpperCase()}</p><h1>¡Gracias, {order.customer_name}!</h1>{isCancelled ? <p>Este pedido no se preparó.</p> : <p>Te avisaremos cuando tu pedido avance.</p>}</div><section className="status-card"><div className="status-top"><div><p className="eyebrow">ESTADO ACTUAL</p><h2>{isCancelled ? 'Cancelado' : labels[current]}</h2></div><span className="live-dot"><i /> En vivo</span></div>{!isCancelled && <div className="timeline">{labels.map((label, index) => <div className={`timeline-step ${index <= current ? 'active' : ''} ${index === current ? 'current' : ''}`} key={label}><div className="step-dot">{index < current ? <Icon name="check" size={14} /> : index + 1}</div><span>{label}</span>{index < labels.length - 1 && <div className="step-line" />}</div>)}</div>}<div className="status-foot"><Icon name={isCancelled ? 'close' : current >= 4 ? 'check' : 'clock'} size={18} /><span>{isCancelled ? <>Pedido <strong>cancelado</strong>. Escríbenos si tienes dudas.</> : <>{current >= 4 ? 'Pedido' : 'Tiempo estimado'} <strong>{current >= 4 ? 'completado' : current >= 3 ? '¡Ya casi!' : business.deliveryEstimate}</strong></>}</span></div></section><section className="order-detail"><div><p className="eyebrow">RESUMEN</p><h2>Tu pedido</h2></div><p>{order.order_type === 'delivery' ? 'Domicilio' : 'Recoger en el local'} · Pago en efectivo</p><strong>{order.total ? money.format(order.total) : 'Total confirmado en caja'}</strong></section></>}</main><SiteFooter onNavigate={navigate} /></div>
 }
 
 export default App

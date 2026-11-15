@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useCart } from '../src/lib/cart'
 import { TERMS_MESSAGE } from '../src/lib/orders'
+import { getRememberedOrderToken } from '../src/lib/customer-session'
 
 // Sin credenciales el checkout no llama a Supabase y el pedido se resuelve en local.
 vi.stubEnv('VITE_SUPABASE_URL', '')
@@ -25,16 +26,32 @@ function renderCheckout() {
 
 const submitForm = () => fireEvent.submit(document.querySelector('form.checkout-form') as HTMLFormElement)
 
-describe('checkout consent', () => {
+const fillContact = (name = 'Ana', phone = '300 123 4567') => {
+  fireEvent.change(screen.getByPlaceholderText('¿Cómo te llamamos?'), { target: { value: name } })
+  fireEvent.change(screen.getByPlaceholderText('300 123 4567'), { target: { value: phone } })
+}
+
+describe('checkout consent and phone', () => {
   beforeEach(() => {
     localStorage.clear()
     useCart.setState({ items: [] })
     useCart.getState().addItem(dish)
   })
 
-  it('blocks the order until the terms and privacy checkbox is checked', async () => {
+  it('requires a phone even for pickup orders', async () => {
     const { navigate } = renderCheckout()
     fireEvent.change(screen.getByPlaceholderText('¿Cómo te llamamos?'), { target: { value: 'Ana' } })
+
+    submitForm()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/teléfono/i)
+    expect(navigate).not.toHaveBeenCalled()
+    expect(useCart.getState().items).toHaveLength(1)
+  })
+
+  it('blocks the order until the terms and privacy checkbox is checked', async () => {
+    const { navigate } = renderCheckout()
+    fillContact()
 
     submitForm()
 
@@ -57,13 +74,15 @@ describe('checkout consent', () => {
 
   it('sends the order once the acceptance is checked', async () => {
     const { navigate, close } = renderCheckout()
-    fireEvent.change(screen.getByPlaceholderText('¿Cómo te llamamos?'), { target: { value: 'Ana' } })
+    fillContact()
     fireEvent.click(screen.getByRole('checkbox'))
     expect(screen.getByRole('checkbox')).toBeChecked()
 
     submitForm()
 
     expect(navigate).toHaveBeenCalledWith(expect.stringMatching(/^\/track\/demo-/))
+    const target = navigate.mock.calls[0][0] as string
+    expect(getRememberedOrderToken()).toBe(target.replace('/track/', ''))
     expect(close).toHaveBeenCalled()
     expect(useCart.getState().items).toEqual([])
   })
