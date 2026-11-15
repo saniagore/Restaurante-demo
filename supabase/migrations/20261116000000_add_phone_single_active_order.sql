@@ -3,7 +3,7 @@
 -- 1. Guarda el teléfono normalizado, el identificador del navegador y un token
 --    de idempotencia en cada pedido.
 -- 2. Impide que un teléfono o un navegador tengan más de un pedido activo a la
---    vez (pending, accepted, preparing, on_the_way).
+--    vez, sin asumir etiquetas concretas del enum `order_status`.
 -- 3. Valida cantidades, número de ítems, platos duplicados y versión legal
 --    dentro del servidor, sin confiar en el cliente.
 -- 4. Normaliza la IP del límite de pedidos y agrega un tope global por minuto.
@@ -14,7 +14,33 @@
 alter table public.orders
   add column if not exists customer_phone text,
   add column if not exists client_id uuid,
-  add column if not exists client_token uuid;
+  add column if not exists client_token uuid,
+  add column if not exists is_active boolean not null default true;
+
+-- `is_active` se deriva del estado comparando texto: así no se asume ningún
+-- valor del enum (hay bases donde el estado inicial no se llama 'pending').
+create or replace function public.sync_order_active()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  new.is_active := new.status::text not in ('completed', 'cancelled');
+  return new;
+end;
+$$;
+
+drop trigger if exists orders_sync_active on public.orders;
+create trigger orders_sync_active
+  before insert or update of status on public.orders
+  for each row execute function public.sync_order_active();
+
+update public.orders
+set is_active = (status::text not in ('completed', 'cancelled'));
+
+drop index if exists public.orders_one_active_per_phone_idx;
+drop index if exists public.orders_one_active_per_client_idx;
 
 create unique index if not exists orders_client_token_idx
   on public.orders (client_token)
@@ -22,13 +48,11 @@ create unique index if not exists orders_client_token_idx
 
 create unique index if not exists orders_one_active_per_phone_idx
   on public.orders (customer_phone)
-  where status in ('pending', 'accepted', 'preparing', 'on_the_way')
-    and customer_phone is not null;
+  where is_active and customer_phone is not null;
 
 create unique index if not exists orders_one_active_per_client_idx
   on public.orders (client_id)
-  where status in ('pending', 'accepted', 'preparing', 'on_the_way')
-    and client_id is not null;
+  where is_active and client_id is not null;
 
 alter table public.order_rate_limits
   drop constraint if exists order_rate_limits_key_length;
