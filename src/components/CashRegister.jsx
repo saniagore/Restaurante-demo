@@ -110,7 +110,7 @@ function CashRegister() {
   }, [load])
 
   const totals = useMemo(
-    () => calculateCashTotals(Number(session?.opening_amount) || 0, sales.cashTotal, movements),
+    () => calculateCashTotals(Number(session?.opening_amount) || 0, sales.cashTotal, movements.filter((movement) => movement.type !== 'income')),
     [session, sales.cashTotal, movements],
   )
   const estimatedDifference = cashDifference(Number(countedAmount) || 0, totals.expected)
@@ -128,7 +128,7 @@ function CashRegister() {
       ? [
           { label: 'Apertura', value: Number(session?.opening_amount) || 0 },
           { label: 'Ventas en efectivo', value: sales.cashTotal, sub: `${sales.cashCount} pedidos` },
-          { label: 'Ingresos', value: totals.income },
+          { label: 'Transferencias', value: sales.transferTotal, sub: `${sales.transferCount} pedidos` },
           { label: 'Gastos y retiros', value: totals.expense + totals.withdrawal },
           { label: 'Efectivo esperado', value: totals.expected, highlight: true },
         ]
@@ -229,7 +229,8 @@ function CashRegister() {
 
     const latestMovements = latestMovementsResult.data || []
     setMovements(latestMovements)
-    const latestTotals = calculateCashTotals(Number(session.opening_amount) || 0, latestSales.cashTotal, latestMovements)
+    const cashMovements = latestMovements.filter((movement) => movement.type !== 'income')
+    const latestTotals = calculateCashTotals(Number(session.opening_amount) || 0, latestSales.cashTotal, cashMovements)
     const difference = cashDifference(counted, latestTotals.expected)
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -292,7 +293,7 @@ function CashRegister() {
         <section className="panel">
           <div className="panel-heading"><div><h2>Movimientos de efectivo</h2><p className="muted">Solo gastos, retiros o ajustes de efectivo.</p></div></div>
           <p className="cash-hint">Las ventas entran automáticamente desde los pedidos. Si el cliente pagó por Nequi o transferencia, marca el pedido como <strong>Transferencia</strong> en Órdenes; no lo registres como ingreso.</p>
-          {movements.some((movement) => movement.type === 'income') && <div className="alert cash-info" role="status">Hay ingresos manuales en esta caja. Si corresponden a un pedido, elimínalos para no duplicar la venta.</div>}
+          {movements.some((movement) => movement.type === 'income') && <div className="alert cash-info" role="status">Hay ingresos manuales antiguos. No se suman al efectivo esperado; si corresponden a un pedido, elimínalos.</div>}
           <form className="cash-form" onSubmit={addMovement}>
             <label>Tipo<select value={movementType} onChange={(event) => setMovementType(event.target.value)}>{MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <label>Monto<MoneyInput required value={movementAmount} onChange={setMovementAmount} placeholder="0" aria-label="Monto del movimiento" /></label>
@@ -311,11 +312,17 @@ function CashRegister() {
 
         <section className="panel cash-close">
           <div className="panel-heading"><div><h2>Cerrar caja</h2><p className="muted">Cuenta el efectivo físico y registra el cierre.</p></div></div>
-          <p className="cash-hint">Las transferencias se guardan en el arqueo, pero no suman al efectivo contado.</p>
+          <div className="cash-close-summary">
+            <div><span>Efectivo esperado</span><strong>{money.format(totals.expected)}</strong></div>
+            <div><span>Transferencias</span><strong>{money.format(sales.transferTotal)}</strong></div>
+            <div><span>Total esperado</span><strong>{money.format(totals.expected + sales.transferTotal)}</strong></div>
+          </div>
+          <p className="cash-hint">Escribe el efectivo físico contado, incluida la base. Las transferencias no se suman al efectivo esperado.</p>
           <form className="cash-form" onSubmit={closeCash}>
             <label>Efectivo contado<MoneyInput required value={countedAmount} onChange={setCountedAmount} placeholder="0" aria-label="Efectivo contado" /></label>
             <label>Notas del cierre<textarea rows="3" value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Novedades, faltantes o sobrantes..." /></label>
-            <div className="cash-difference"><span>Diferencia estimada</span><strong className={estimatedDifference === 0 ? '' : estimatedDifference > 0 ? 'positive' : 'negative'}>{money.format(estimatedDifference)}</strong></div>
+            <div className="cash-difference"><span>Diferencia de efectivo</span><strong className={estimatedDifference === 0 ? '' : estimatedDifference > 0 ? 'positive' : 'negative'}>{money.format(estimatedDifference)}</strong></div>
+            {estimatedDifference < 0 && sales.transferTotal > 0 && <p className="cash-hint negative">La diferencia es negativa. Revisa que los pedidos pagados por Nequi estén marcados como Transferencia en Órdenes; si siguen como Efectivo, el esperado incluye dinero que no está en la caja.</p>}
             <button className="primary-button" disabled={working || sales.error || !countedAmount}>Cerrar caja</button>
           </form>
         </section>
