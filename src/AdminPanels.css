@@ -129,3 +129,27 @@ select:focus { border-color: var(--orange); box-shadow: 0 0 0 3px #e85d3220; }
   .menu-filter-group button { flex: 1; }
   .header-actions { justify-content: flex-start; margin-top: 10px; }
 }
+
+.category-manager { margin-bottom:18px; }
+.category-add { display:flex; gap:8px; margin-bottom:14px; }
+.category-add input { flex:1; }
+.category-add .secondary-button { padding:9px 14px; font-size:11px; white-space:nowrap; }
+.category-list { display:grid; gap:6px; }
+.category-row-item { display:flex; align-items:center; gap:10px; padding:9px 11px; background:#faf9f6; border:1px solid var(--line); border-radius:8px; }
+.category-dot { width:8px; height:8px; flex:0 0 auto; background:var(--orange); border-radius:50%; }
+.category-row-item strong { font-size:11px; }
+.category-row-item small { color:#85858b; font-size:9px; }
+.category-actions { display:flex; align-items:center; gap:4px; margin-left:auto; }
+.category-actions .text-button { padding:3px 4px; font-size:10px; }
+.category-actions .text-button:disabled { opacity:.35; }
+.category-edit { display:flex; flex:1; gap:6px; align-items:center; }
+.category-edit input { padding:6px 8px; font-size:11px; }
+.category-edit .secondary-button { padding:6px 9px; font-size:10px; white-space:nowrap; }
+.category-edit .text-button { padding:6px 4px; font-size:10px; white-space:nowrap; }
+.category-empty { margin:4px 0 0; font-size:11px; }
+.menu-category-filter { display:flex; align-items:center; gap:8px; color:#85858b; font-size:10px; font-weight:600; white-space:nowrap; }
+.menu-category-filter select { width:auto; padding:8px 10px; font-size:11px; }
+.menu-card-category { color:var(--orange); font-size:8px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; }
+.menu-preview-category { color:#85858b; font-size:9px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; }
+
+@media (max-width:760px) { .category-add { flex-wrap:wrap; } .category-add .secondary-button { width:100%; } .category-row-item { flex-wrap:wrap; } .category-actions { width:100%; margin-left:0; } .menu-category-filter { width:100%; justify-content:space-between; } .menu-category-filter select { flex:1; } }
