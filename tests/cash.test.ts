@@ -1,0 +1,26 @@
+import { describe, expect, it } from 'vitest'
+import { calculateCashTotals, cashDifference } from '../src/lib/cash'
+
+describe('cash totals', () => {
+  it('adds sales and income, subtracts expenses and withdrawals', () => {
+    const totals = calculateCashTotals(50000, 120000, [
+      { type: 'income', amount: 10000 },
+      { type: 'expense', amount: 15000 },
+      { type: 'withdrawal', amount: 20000 },
+      { type: 'ignored', amount: 999 },
+    ])
+    expect(totals).toEqual({ income: 10000, expense: 15000, withdrawal: 20000, expected: 145000 })
+  })
+
+  it('works without movements and with numeric strings', () => {
+    const totals = calculateCashTotals(0, 0, [])
+    expect(totals.expected).toBe(0)
+    expect(calculateCashTotals(10000, 5000, [{ type: 'expense', amount: 2500 }]).expected).toBe(12500)
+  })
+
+  it('computes the closing difference', () => {
+    expect(cashDifference(150000, 145000)).toBe(5000)
+    expect(cashDifference(140000, 145000)).toBe(-5000)
+    expect(cashDifference(0, 0)).toBe(0)
+  })
+})
