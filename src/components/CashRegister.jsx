@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { CASH_MOVEMENT_LABELS, calculateCashTotals, cashDifference } from '../lib/cash'
+import { CASH_MOVEMENT_LABELS, calculateCashTotals, cashDifference, summarizeSales } from '../lib/cash'
 import { MoneyInput } from './MoneyInput'
 
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
@@ -9,6 +9,11 @@ const MOVEMENT_TYPES = [
   { value: 'income', label: 'Ingreso' },
   { value: 'expense', label: 'Gasto' },
   { value: 'withdrawal', label: 'Retiro' },
+]
+const CASH_MODES = [
+  { value: 'total', label: 'Total' },
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'transfer', label: 'Transferencias' },
 ]
 
 async function fetchCashSales(session) {
@@ -22,29 +27,26 @@ async function fetchCashSales(session) {
 
   if (error) {
     console.error('No se pudieron calcular las ventas de caja', error)
-    return { total: 0, count: 0, error: true }
+    return { cashTotal: 0, transferTotal: 0, cashCount: 0, transferCount: 0, error: true }
   }
 
   const seen = new Set()
-  let total = 0
-  let count = 0
+  const completed = []
   for (const row of data || []) {
     if (!row.order_id || seen.has(row.order_id)) continue
     const order = Array.isArray(row.orders) ? row.orders[0] : row.orders
     if (!order) continue
-    if (order.payment_method && order.payment_method !== 'cash') continue
     seen.add(row.order_id)
-    total += Number(order.total || 0)
-    count += 1
+    completed.push(order)
   }
-  return { total, count, error: false }
+  return { ...summarizeSales(completed), error: false }
 }
 
 function CashRegister() {
   const [session, setSession] = useState(null)
   const [movements, setMovements] = useState([])
   const [history, setHistory] = useState([])
-  const [sales, setSales] = useState({ total: 0, count: 0, error: false })
+  const [sales, setSales] = useState({ cashTotal: 0, transferTotal: 0, cashCount: 0, transferCount: 0, error: false })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [working, setWorking] = useState(false)
@@ -56,6 +58,7 @@ function CashRegister() {
   const [countedAmount, setCountedAmount] = useState('')
   const [closingNotes, setClosingNotes] = useState('')
   const [justClosed, setJustClosed] = useState(null)
+  const [mode, setMode] = useState('total')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -87,7 +90,7 @@ function CashRegister() {
       setSales(salesResult)
     } else {
       setMovements([])
-      setSales({ total: 0, count: 0, error: false })
+      setSales({ cashTotal: 0, transferTotal: 0, cashCount: 0, transferCount: 0, error: false })
     }
 
     const { data: closed, error: closedError } = await supabase
@@ -108,10 +111,35 @@ function CashRegister() {
   }, [load])
 
   const totals = useMemo(
-    () => calculateCashTotals(Number(session?.opening_amount) || 0, sales.total, movements),
-    [session, sales.total, movements],
+    () => calculateCashTotals(Number(session?.opening_amount) || 0, sales.cashTotal, movements),
+    [session, sales.cashTotal, movements],
   )
   const estimatedDifference = cashDifference(Number(countedAmount) || 0, totals.expected)
+  const totalSales = sales.cashTotal + sales.transferTotal
+  const totalCount = sales.cashCount + sales.transferCount
+  const summaryCards = mode === 'transfer'
+    ? [
+        { label: 'Transferencias', value: sales.transferTotal, sub: `${sales.transferCount} pedidos`, highlight: true },
+        { label: 'Ventas totales', value: totalSales },
+        { label: 'Efectivo', value: sales.cashTotal },
+        { label: 'Pedidos por transferencia', value: sales.transferCount, count: true },
+        { label: 'Efectivo esperado', value: totals.expected },
+      ]
+    : mode === 'cash'
+      ? [
+          { label: 'Apertura', value: Number(session?.opening_amount) || 0 },
+          { label: 'Ventas en efectivo', value: sales.cashTotal, sub: `${sales.cashCount} pedidos` },
+          { label: 'Ingresos', value: totals.income },
+          { label: 'Gastos y retiros', value: totals.expense + totals.withdrawal },
+          { label: 'Efectivo esperado', value: totals.expected, highlight: true },
+        ]
+      : [
+          { label: 'Apertura', value: Number(session?.opening_amount) || 0 },
+          { label: 'Ventas totales', value: totalSales, sub: `${totalCount} pedidos`, highlight: true },
+          { label: 'Efectivo', value: sales.cashTotal, sub: `${sales.cashCount} pedidos` },
+          { label: 'Transferencias', value: sales.transferTotal, sub: `${sales.transferCount} pedidos` },
+          { label: 'Efectivo esperado', value: totals.expected },
+        ]
 
   async function openCash(event) {
     event.preventDefault()
@@ -202,7 +230,7 @@ function CashRegister() {
 
     const latestMovements = latestMovementsResult.data || []
     setMovements(latestMovements)
-    const latestTotals = calculateCashTotals(Number(session.opening_amount) || 0, latestSales.total, latestMovements)
+    const latestTotals = calculateCashTotals(Number(session.opening_amount) || 0, latestSales.cashTotal, latestMovements)
     const difference = cashDifference(counted, latestTotals.expected)
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -213,8 +241,12 @@ function CashRegister() {
         counted_amount: counted,
         expected_amount: latestTotals.expected,
         difference,
-        sales_total: latestSales.total,
-        sales_count: latestSales.count,
+        sales_total: latestSales.cashTotal + latestSales.transferTotal,
+        sales_count: latestSales.cashCount + latestSales.transferCount,
+        cash_sales_total: latestSales.cashTotal,
+        transfer_sales_total: latestSales.transferTotal,
+        cash_sales_count: latestSales.cashCount,
+        transfer_sales_count: latestSales.transferCount,
         closing_notes: closingNotes.trim() || null,
         closed_at: new Date().toISOString(),
         closed_by: user?.id || null,
@@ -244,18 +276,22 @@ function CashRegister() {
     {error && <div className="alert" role="alert">{error}<button aria-label="Cerrar alerta" onClick={() => setError('')}>×</button></div>}
 
     {loading ? <div className="empty-state">Cargando caja...</div> : session ? <>
+      <div className="cash-mode" role="tablist" aria-label="Vista de caja">
+        {CASH_MODES.map((option) => <button type="button" role="tab" key={option.value} aria-selected={mode === option.value} className={mode === option.value ? 'active' : ''} onClick={() => setMode(option.value)}>{option.label}</button>)}
+      </div>
+      <p className="cash-mode-note">El cierre siempre cuenta el efectivo físico; las transferencias se guardan aparte.</p>
       <section className="cash-summary">
-        <article><span>Apertura</span><strong>{money.format(Number(session.opening_amount) || 0)}</strong></article>
-        <article><span>Ventas en efectivo</span><strong>{money.format(sales.total)}</strong><small>{sales.count} {sales.count === 1 ? 'pedido' : 'pedidos'}</small></article>
-        <article><span>Ingresos</span><strong>{money.format(totals.income)}</strong></article>
-        <article><span>Gastos y retiros</span><strong>{money.format(totals.expense + totals.withdrawal)}</strong></article>
-        <article className="cash-expected"><span>Efectivo esperado</span><strong>{money.format(totals.expected)}</strong></article>
+        {summaryCards.map((card) => <article key={card.label} className={card.highlight ? 'cash-expected' : ''}>
+          <span>{card.label}</span>
+          <strong>{card.count ? card.value : money.format(card.value)}</strong>
+          {card.sub && <small>{card.sub}</small>}
+        </article>)}
       </section>
       {sales.error && <div className="alert" role="alert">No se pudieron calcular las ventas desde el historial de pedidos. Revisa la migración antes de cerrar.</div>}
 
       <div className="cash-layout">
         <section className="panel">
-          <div className="panel-heading"><div><h2>Movimientos</h2><p className="muted">Gastos, retiros e ingresos del turno.</p></div></div>
+          <div className="panel-heading"><div><h2>Movimientos de efectivo</h2><p className="muted">Gastos, retiros e ingresos del turno.</p></div></div>
           <form className="cash-form" onSubmit={addMovement}>
             <label>Tipo<select value={movementType} onChange={(event) => setMovementType(event.target.value)}>{MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <label>Monto<MoneyInput required value={movementAmount} onChange={setMovementAmount} placeholder="0" aria-label="Monto del movimiento" /></label>
@@ -274,6 +310,7 @@ function CashRegister() {
 
         <section className="panel cash-close">
           <div className="panel-heading"><div><h2>Cerrar caja</h2><p className="muted">Cuenta el efectivo físico y registra el cierre.</p></div></div>
+          <p className="cash-hint">Las transferencias se guardan en el arqueo, pero no suman al efectivo contado.</p>
           <form className="cash-form" onSubmit={closeCash}>
             <label>Efectivo contado<MoneyInput required value={countedAmount} onChange={setCountedAmount} placeholder="0" aria-label="Efectivo contado" /></label>
             <label>Notas del cierre<textarea rows="3" value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Novedades, faltantes o sobrantes..." /></label>
@@ -288,6 +325,8 @@ function CashRegister() {
         <div className="cash-result-grid">
           <span>Esperado <strong>{money.format(Number(justClosed.expected_amount) || 0)}</strong></span>
           <span>Contado <strong>{money.format(Number(justClosed.counted_amount) || 0)}</strong></span>
+          <span>Transferencias <strong>{money.format(Number(justClosed.transfer_sales_total) || 0)}</strong></span>
+          <span>Total ventas <strong>{money.format(Number(justClosed.sales_total) || 0)}</strong></span>
           <span>Diferencia <strong className={Number(justClosed.difference) === 0 ? '' : Number(justClosed.difference) > 0 ? 'positive' : 'negative'}>{money.format(Number(justClosed.difference) || 0)}</strong></span>
         </div>
         <button className="secondary-button" onClick={() => setJustClosed(null)}>Preparar nueva caja</button>
@@ -307,15 +346,22 @@ function CashRegister() {
       <div className="panel-heading"><div><h2>Cierres recientes</h2><p className="muted">Últimos turnos cerrados.</p></div></div>
       {history.length ? <div className="cash-table-wrap">
         <table className="cash-table">
-          <thead><tr><th>Cierre</th><th>Base</th><th>Ventas</th><th>Esperado</th><th>Contado</th><th>Diferencia</th></tr></thead>
-          <tbody>{history.map((item) => <tr key={item.id}>
-            <td>{formatDate(item.closed_at)}</td>
-            <td>{money.format(Number(item.opening_amount) || 0)}</td>
-            <td>{money.format(Number(item.sales_total) || 0)}<small>{item.sales_count || 0} pedidos</small></td>
-            <td>{money.format(Number(item.expected_amount) || 0)}</td>
-            <td>{money.format(Number(item.counted_amount) || 0)}</td>
-            <td><strong className={Number(item.difference) === 0 ? '' : Number(item.difference) > 0 ? 'positive' : 'negative'}>{money.format(Number(item.difference) || 0)}</strong></td>
-          </tr>)}</tbody>
+          <thead><tr><th>Cierre</th><th>Base</th><th>Efectivo</th><th>Transferencias</th><th>Total</th><th>Esperado</th><th>Contado</th><th>Diferencia</th></tr></thead>
+          <tbody>{history.map((item) => {
+            const transfer = Number(item.transfer_sales_total) || 0
+            const cash = Number(item.cash_sales_total) || (transfer ? 0 : Number(item.sales_total) || 0)
+            const total = Number(item.sales_total) || cash + transfer
+            return <tr key={item.id}>
+              <td>{formatDate(item.closed_at)}</td>
+              <td>{money.format(Number(item.opening_amount) || 0)}</td>
+              <td>{money.format(cash)}<small>{item.cash_sales_count || 0} pedidos</small></td>
+              <td>{money.format(transfer)}<small>{item.transfer_sales_count || 0} pedidos</small></td>
+              <td>{money.format(total)}</td>
+              <td>{money.format(Number(item.expected_amount) || 0)}</td>
+              <td>{money.format(Number(item.counted_amount) || 0)}</td>
+              <td><strong className={Number(item.difference) === 0 ? '' : Number(item.difference) > 0 ? 'positive' : 'negative'}>{money.format(Number(item.difference) || 0)}</strong></td>
+            </tr>
+          })}</tbody>
         </table>
       </div> : <div className="empty-state">Aún no hay cierres de caja.</div>}
     </section>

@@ -4,8 +4,8 @@
 -- Reúne en un solo archivo el esquema base mínimo, las 11 migraciones que ya
 -- existían en el repositorio, las 2 de cumplimiento legal, las 2 de pedido
 -- único, teléfono y cancelación, la de `pickup`, la de categorías, la del
--- bucket de imágenes, la de caja y la de costos (20 en total). Está pensado
--- para pegarse completo en Supabase:
+-- bucket de imágenes, la de caja, la de costos y la de transferencias
+-- (21 en total). Está pensado para pegarse completo en Supabase:
 --
 --   Supabase → SQL Editor → New query → pegar → Run
 --
@@ -1133,3 +1133,31 @@ create trigger order_items_fill_cost
 
 comment on column public.dishes.costo is 'Costo estimado del plato para calcular ganancia.';
 comment on column public.order_items.unit_cost is 'Costo del plato al momento del pedido.';
+
+-- ============================================================================
+-- 18. TRANSFERENCIAS EN LA CAJA
+-- ============================================================================
+
+-- Ventas por transferencia en la caja.
+--
+-- Separa las ventas del turno entre efectivo y transferencia. El cierre sigue
+-- calculando el efectivo físico; las transferencias se guardan aparte para el
+-- arqueo total.
+
+alter table public.cash_sessions
+  add column if not exists cash_sales_total numeric(12,2) not null default 0,
+  add column if not exists transfer_sales_total numeric(12,2) not null default 0,
+  add column if not exists cash_sales_count integer not null default 0,
+  add column if not exists transfer_sales_count integer not null default 0;
+
+alter table public.orders
+  drop constraint if exists orders_payment_method_check;
+
+alter table public.orders
+  add constraint orders_payment_method_check
+  check (payment_method in ('cash', 'transfer'));
+
+comment on column public.cash_sessions.cash_sales_total is 'Ventas cobradas en efectivo durante el turno.';
+comment on column public.cash_sessions.transfer_sales_total is 'Ventas cobradas por transferencia durante el turno.';
+comment on column public.cash_sessions.cash_sales_count is 'Pedidos cobrados en efectivo.';
+comment on column public.cash_sessions.transfer_sales_count is 'Pedidos cobrados por transferencia.';
