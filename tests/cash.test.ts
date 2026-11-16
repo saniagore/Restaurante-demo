@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateCashTotals, cashDifference } from '../src/lib/cash'
+import { calculateCashTotals, cashDifference, sanitizeCashAmount } from '../src/lib/cash'
 
 describe('cash totals', () => {
   it('adds sales and income, subtracts expenses and withdrawals', () => {
@@ -22,5 +22,13 @@ describe('cash totals', () => {
     expect(cashDifference(150000, 145000)).toBe(5000)
     expect(cashDifference(140000, 145000)).toBe(-5000)
     expect(cashDifference(0, 0)).toBe(0)
+  })
+
+  it('accepts amounts with dots, commas or currency symbols', () => {
+    expect(sanitizeCashAmount('150.000')).toBe('150000')
+    expect(sanitizeCashAmount('$ 150.000,00')).toBe('15000000')
+    expect(sanitizeCashAmount('150000')).toBe('150000')
+    expect(sanitizeCashAmount('')).toBe('')
+    expect(sanitizeCashAmount('123456789012')).toBe('1234567890')
   })
 })
