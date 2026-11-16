@@ -166,3 +166,9 @@ select:focus { border-color: var(--orange); box-shadow: 0 0 0 3px #e85d3220; }
 .category-move { display:none; gap:2px; }
 .category-move .text-button:disabled { opacity:.3; }
 @media (hover: none) { .category-move { display:inline-flex; } }
+
+.menu-file-field { gap:8px; }
+.menu-file-field input[type=file] { padding:9px 11px; color:#67666c; background:#fff; border:1px dashed #dcdad6; border-radius:8px; font-size:10px; cursor:pointer; }
+.menu-file-field input[type=file]::file-selector-button { margin-right:10px; padding:6px 10px; color:var(--ink); background:#f4f2ee; border:1px solid var(--line); border-radius:6px; font-size:10px; font-weight:600; cursor:pointer; }
+.menu-file-hint { margin:-8px 0 0; color:#85858b; font-size:9px; line-height:1.45; }
+.menu-image-remove { justify-self:start; margin-top:-6px; padding:0; color:#b6382b; font-size:10px; }
