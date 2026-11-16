@@ -3,9 +3,11 @@ import { supabase } from './lib/supabase'
 import AuthScreen from './components/AuthScreen'
 import Dashboard from './components/Dashboard'
 import OrdersBoard from './components/OrdersBoard'
+import OrdersHistory from './components/OrdersHistory'
 import MenuManager from './components/MenuManager'
 import { isAdminSession } from './lib/auth'
 import './Admin.css'
+import './AdminPanels.css'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -62,6 +64,9 @@ function App() {
             <button className={activeView === 'orders' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('orders')}>
               <span>▣</span> Órdenes
             </button>
+            <button className={activeView === 'history' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('history')}>
+              <span>▤</span> Historial
+            </button>
           </div>
           <div className="nav-group">
             <p className="nav-label">Catálogo</p>
@@ -76,7 +81,7 @@ function App() {
         </div>
       </aside>
       <main className="main-content">
-        {activeView === 'dashboard' ? <Dashboard onOpenOrders={() => setActiveView('orders')} /> : activeView === 'orders' ? <OrdersBoard /> : <MenuManager />}
+        {activeView === 'dashboard' ? <Dashboard onOpenOrders={() => setActiveView('orders')} /> : activeView === 'orders' ? <OrdersBoard onOpenHistory={() => setActiveView('history')} /> : activeView === 'history' ? <OrdersHistory /> : <MenuManager />}
       </main>
     </div>
   )

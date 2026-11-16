@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { getDayRange, isInRange } from '../lib/order-filters'
 
 const columns = [
   { key: 'pending', label: 'Pendientes', icon: '◷', next: 'accepted', action: 'Aceptar pedido' },
@@ -14,7 +15,7 @@ const money = (value) => `$${Number(value || 0).toFixed(2)}`
 const formatTime = (value) => new Date(value).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
 const uniqueOrders = (orders) => Array.from(new Map(orders.map((order) => [order.id, order])).values())
 
-function OrdersBoard() {
+function OrdersBoard({ onOpenHistory }) {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -22,9 +23,12 @@ function OrdersBoard() {
   const [collapsedColumns, setCollapsedColumns] = useState({ completed: true, cancelled: true })
   const loadOrders = useCallback(async () => {
     setLoading(true)
+    const { startIso, endIso } = getDayRange()
     const { data, error: queryError } = await supabase
       .from('orders')
       .select('*, order_items(*, dishes(nombre,descripcion))')
+      .gte('created_at', startIso)
+      .lt('created_at', endIso)
       .order('created_at', { ascending: false })
     if (queryError) setError(`No se pudieron cargar las órdenes: ${queryError.message}`)
     else setOrders(uniqueOrders(data || []))
@@ -39,6 +43,8 @@ function OrdersBoard() {
     const channel = supabase.channel('admin-orders')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
         if (payload.eventType === 'INSERT') {
+          const { startIso, endIso } = getDayRange()
+          if (!isInRange(payload.new.created_at, startIso, endIso)) return
           const { data: insertedOrder } = await supabase.from('orders').select('*, order_items(*, dishes(nombre,descripcion))').eq('id', payload.new.id).single()
           setOrders((current) => uniqueOrders([insertedOrder || payload.new, ...current]))
         }
@@ -72,8 +78,12 @@ function OrdersBoard() {
   return (
     <>
       <header className="page-header">
-        <div><p className="eyebrow">OPERACIÓN · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1>Órdenes <span className="live-dot">● En vivo</span></h1></div>
-        <button className="secondary-button" onClick={loadOrders}>↻ Actualizar</button>
+        <div><p className="eyebrow">OPERACIÓN · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1>Órdenes de hoy <span className="live-dot">● En vivo</span></h1></div>
+        <div className="header-actions">
+          <span className="today-chip">{orders.length} {orders.length === 1 ? 'pedido hoy' : 'pedidos hoy'}</span>
+          <button className="secondary-button" onClick={loadOrders}>↻ Actualizar</button>
+          {onOpenHistory && <button className="secondary-button" onClick={onOpenHistory}>Historial</button>}
+        </div>
       </header>
       {error && <div className="alert" role="alert">{error}<button aria-label="Cerrar alerta" onClick={() => setError('')}>×</button></div>}
       {loading ? <div className="empty-state">Cargando órdenes...</div> : <div className="orders-board">
