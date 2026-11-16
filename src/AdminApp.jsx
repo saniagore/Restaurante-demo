@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard'
 import OrdersBoard from './components/OrdersBoard'
 import OrdersHistory from './components/OrdersHistory'
 import CashRegister from './components/CashRegister'
+import Statistics from './components/Statistics'
 import MenuManager from './components/MenuManager'
 import { isAdminSession } from './lib/auth'
 import './Admin.css'
@@ -71,6 +72,9 @@ function App() {
             <button className={activeView === 'cash' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('cash')}>
               <span>◫</span> Caja
             </button>
+            <button className={activeView === 'stats' ? 'nav-item active' : 'nav-item'} onClick={() => setActiveView('stats')}>
+              <span>∑</span> Estadísticas
+            </button>
           </div>
           <div className="nav-group">
             <p className="nav-label">Catálogo</p>
@@ -85,7 +89,7 @@ function App() {
         </div>
       </aside>
       <main className="main-content">
-        {activeView === 'dashboard' ? <Dashboard onOpenOrders={() => setActiveView('orders')} /> : activeView === 'orders' ? <OrdersBoard onOpenHistory={() => setActiveView('history')} /> : activeView === 'history' ? <OrdersHistory /> : activeView === 'cash' ? <CashRegister /> : <MenuManager />}
+        {activeView === 'dashboard' ? <Dashboard onOpenOrders={() => setActiveView('orders')} /> : activeView === 'orders' ? <OrdersBoard onOpenHistory={() => setActiveView('history')} /> : activeView === 'history' ? <OrdersHistory /> : activeView === 'cash' ? <CashRegister /> : activeView === 'stats' ? <Statistics onOpenMenu={() => setActiveView('menu')} /> : <MenuManager />}
       </main>
     </div>
   )

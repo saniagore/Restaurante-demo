@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { buildDishImagePath, validateImageFile } from '../lib/image-upload'
 
-const emptyDish = { name: '', description: '', price: '', imagen_url: '', is_available: true, category_id: '' }
+const emptyDish = { name: '', description: '', price: '', costo: '', imagen_url: '', is_available: true, category_id: '' }
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
 const FILTERS = [
   { value: 'all', label: 'Todos' },
@@ -113,6 +113,7 @@ function MenuManager() {
       name: dish.nombre || '',
       description: dish.descripcion || '',
       price: dish.precio ?? '',
+      costo: dish.costo ?? '',
       imagen_url: dish.imagen_url || '',
       is_available: dish.is_available !== false,
       category_id: dish.category_id || '',
@@ -159,6 +160,11 @@ function MenuManager() {
       setError('El precio debe ser un número mayor o igual a cero.')
       return
     }
+    const cost = form.costo === '' ? null : Number(form.costo)
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {
+      setError('El costo debe ser un número mayor o igual a cero.')
+      return
+    }
 
     let image = form.imagen_url.trim()
     if (!imageFile && image && !/^https:\/\//i.test(image) && !image.startsWith('/')) {
@@ -193,6 +199,7 @@ function MenuManager() {
       nombre: form.name.trim(),
       descripcion: form.description.trim(),
       precio: price,
+      costo: cost,
       imagen_url: image,
       is_available: Boolean(form.is_available),
       category_id: form.category_id || null,
@@ -453,8 +460,10 @@ function MenuManager() {
             <label>Descripción<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows="3" placeholder="Ingredientes, tamaño o lo que lo hace especial" /></label>
             <div className="form-row">
               <label>Precio<input required min="0" step="100" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="0" /></label>
-              <label>Categoría<select value={form.category_id || ''} onChange={(event) => setForm({ ...form, category_id: event.target.value })}><option value="">Sin categoría</option>{sortedCategories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></label>
+              <label>Costo por plato<input min="0" step="100" type="number" value={form.costo ?? ''} onChange={(event) => setForm({ ...form, costo: event.target.value })} placeholder="Opcional" /></label>
             </div>
+            <label>Categoría<select value={form.category_id || ''} onChange={(event) => setForm({ ...form, category_id: event.target.value })}><option value="">Sin categoría</option>{sortedCategories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></label>
+            <p className="menu-file-hint">El costo es opcional; se usa para calcular la ganancia en Estadísticas.</p>
             <label className="menu-file-field">Imagen del plato<input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} /></label>
             <p className="menu-file-hint">JPG, PNG o WebP · máximo 5 MB. {form.imagen_url && !imageFile ? 'Puedes mantener la actual o elegir otra.' : 'La imagen se sube al guardar el plato.'}</p>
             {(imagePreview || form.imagen_url) && <button type="button" className="text-button menu-image-remove" onClick={removeImage}>Quitar imagen</button>}
@@ -486,6 +495,7 @@ function MenuManager() {
           <span className="menu-card-category">{categoryName(dish.category_id) || 'Sin categoría'}</span>
           <div className="menu-card-title"><h3>{dish.nombre}</h3><strong>{money.format(Number(dish.precio || 0))}</strong></div>
           <p>{dish.descripcion || 'Sin descripción'}</p>
+          {dish.costo !== null && dish.costo !== undefined && Number(dish.precio) > 0 && <span className="menu-card-cost">Costo {money.format(Number(dish.costo))} · Margen {Math.round(((Number(dish.precio) - Number(dish.costo)) / Number(dish.precio)) * 100)}%</span>}
           <div className="menu-card-actions">
             <button className="edit-button" onClick={() => openForm(dish)}>Editar</button>
             <button className={`switch ${dish.is_available ? 'on' : ''}`} onClick={() => toggleAvailability(dish)} aria-label={`${dish.is_available ? 'Marcar agotado' : 'Marcar disponible'}: ${dish.nombre}`} aria-pressed={Boolean(dish.is_available)}><span /></button>
