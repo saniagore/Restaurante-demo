@@ -6,7 +6,6 @@ import { MoneyInput } from './MoneyInput'
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
 const formatDate = (value) => value ? new Date(value).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '—'
 const MOVEMENT_TYPES = [
-  { value: 'income', label: 'Ingreso' },
   { value: 'expense', label: 'Gasto' },
   { value: 'withdrawal', label: 'Retiro' },
 ]
@@ -279,7 +278,7 @@ function CashRegister() {
       <div className="cash-mode" role="tablist" aria-label="Vista de caja">
         {CASH_MODES.map((option) => <button type="button" role="tab" key={option.value} aria-selected={mode === option.value} className={mode === option.value ? 'active' : ''} onClick={() => setMode(option.value)}>{option.label}</button>)}
       </div>
-      <p className="cash-mode-note">El cierre siempre cuenta el efectivo físico; las transferencias se guardan aparte.</p>
+      <p className="cash-mode-note">El cierre siempre cuenta el efectivo físico. Total = efectivo + transferencias; las transferencias no se suman al efectivo esperado.</p>
       <section className="cash-summary">
         {summaryCards.map((card) => <article key={card.label} className={card.highlight ? 'cash-expected' : ''}>
           <span>{card.label}</span>
@@ -291,7 +290,9 @@ function CashRegister() {
 
       <div className="cash-layout">
         <section className="panel">
-          <div className="panel-heading"><div><h2>Movimientos de efectivo</h2><p className="muted">Gastos, retiros e ingresos del turno.</p></div></div>
+          <div className="panel-heading"><div><h2>Movimientos de efectivo</h2><p className="muted">Solo gastos, retiros o ajustes de efectivo.</p></div></div>
+          <p className="cash-hint">Las ventas entran automáticamente desde los pedidos. Si el cliente pagó por Nequi o transferencia, marca el pedido como <strong>Transferencia</strong> en Órdenes; no lo registres como ingreso.</p>
+          {movements.some((movement) => movement.type === 'income') && <div className="alert cash-info" role="status">Hay ingresos manuales en esta caja. Si corresponden a un pedido, elimínalos para no duplicar la venta.</div>}
           <form className="cash-form" onSubmit={addMovement}>
             <label>Tipo<select value={movementType} onChange={(event) => setMovementType(event.target.value)}>{MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <label>Monto<MoneyInput required value={movementAmount} onChange={setMovementAmount} placeholder="0" aria-label="Monto del movimiento" /></label>

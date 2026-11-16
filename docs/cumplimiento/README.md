@@ -98,6 +98,7 @@ Notas:
 - Las **imágenes** se suben al bucket público `dish-images`; el bucket acepta JPG, PNG y WebP de hasta 5 MB. Solo un usuario con rol admin puede subir, reemplazar o borrar archivos.
 - La **caja** calcula las ventas en efectivo desde los pedidos completados durante el turno. Solo puede existir una caja abierta; los ingresos, gastos y retiros se registran como movimientos. El cierre guarda efectivo, transferencias, esperado, contado y diferencia.
 - Las **transferencias** se toman de los pedidos marcados con método de pago “Transferencia” en Órdenes. La caja permite alternar entre Total, Efectivo y Transferencias; el cierre físico siempre usa solo el efectivo.
+- **No registres pagos de pedidos como ingresos manuales**: si un cliente paga por Nequi, marca su pedido como Transferencia. La caja ya suma esa venta una sola vez y no la incluye en el efectivo esperado.
 - Las **estadísticas** usan los pedidos completados y el costo guardado en cada ítem. Si un plato no tiene costo, su ganancia se muestra como ingreso y el panel avisa cuáles completar.
 - El pedido se rechaza con el código `22023` si no incluye teléfono válido, versión legal vigente, más de 50 ítems, platos duplicados o cantidades fuera de 1-99.
 - Si el teléfono o el navegador ya tienen un pedido activo, la RPC responde `Ya tienes un pedido activo` (código `P0001`) y no crea una fila.
