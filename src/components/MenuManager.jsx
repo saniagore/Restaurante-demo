@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { buildDishImagePath, validateImageFile } from '../lib/image-upload'
 
 const emptyDish = { name: '', description: '', price: '', imagen_url: '', is_available: true, category_id: '' }
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
@@ -33,7 +34,14 @@ function MenuManager() {
   const [editingCategoryName, setEditingCategoryName] = useState('')
   const [draggingCategoryId, setDraggingCategoryId] = useState(null)
   const [dragOverCategoryId, setDragOverCategoryId] = useState(null)
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState('')
+  const previewUrlRef = useRef('')
   const formRef = useRef(null)
+
+  useEffect(() => () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -88,8 +96,18 @@ function MenuManager() {
     return matchesFilter && matchesCategory && matchesSearch
   })
 
+  function clearPreview() {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current)
+      previewUrlRef.current = ''
+    }
+    setImagePreview('')
+    setImageFile(null)
+  }
+
   function openForm(dish = null) {
     setError('')
+    clearPreview()
     setEditingId(dish?.id || null)
     setForm(dish ? {
       name: dish.nombre || '',
@@ -108,22 +126,69 @@ function MenuManager() {
     setForm(emptyDish)
     setFormOpen(false)
     setError('')
+    clearPreview()
+  }
+
+  function handleImageChange(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    const validation = validateImageFile(file)
+    if (validation) {
+      setError(validation)
+      return
+    }
+    setError('')
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    const url = URL.createObjectURL(file)
+    previewUrlRef.current = url
+    setImageFile(file)
+    setImagePreview(url)
+  }
+
+  function removeImage() {
+    clearPreview()
+    setForm((current) => ({ ...current, imagen_url: '' }))
   }
 
   async function saveDish(event) {
     event.preventDefault()
     setError('')
-    const image = form.imagen_url.trim()
-    if (image && !/^https:\/\//i.test(image) && !image.startsWith('/')) {
-      setError('La imagen debe ser una URL https o una ruta interna del sitio.')
-      return
-    }
     const price = Number(form.price)
     if (!Number.isFinite(price) || price < 0) {
       setError('El precio debe ser un número mayor o igual a cero.')
       return
     }
+
+    let image = form.imagen_url.trim()
+    if (!imageFile && image && !/^https:\/\//i.test(image) && !image.startsWith('/')) {
+      setError('La imagen debe ser una URL https o una ruta interna del sitio.')
+      return
+    }
+    if (imageFile) {
+      const validation = validateImageFile(imageFile)
+      if (validation) {
+        setError(validation)
+        return
+      }
+    }
+
     setSaving(true)
+    let uploadedPath = null
+    if (imageFile) {
+      uploadedPath = buildDishImagePath(imageFile.name)
+      const { error: uploadError } = await supabase.storage
+        .from('dish-images')
+        .upload(uploadedPath, imageFile, { cacheControl: '31536000', contentType: imageFile.type, upsert: false })
+      if (uploadError) {
+        console.error('No se pudo subir la imagen', uploadError)
+        setError('No se pudo subir la imagen. Revisa que el bucket dish-images esté creado.')
+        setSaving(false)
+        return
+      }
+      image = supabase.storage.from('dish-images').getPublicUrl(uploadedPath).data.publicUrl
+    }
+
     const payload = {
       nombre: form.name.trim(),
       descripcion: form.description.trim(),
@@ -136,6 +201,7 @@ function MenuManager() {
       ? await supabase.from('dishes').update(payload).eq('id', editingId).select().single()
       : await supabase.from('dishes').insert(payload).select().single()
     if (response.error) {
+      if (uploadedPath) await supabase.storage.from('dish-images').remove([uploadedPath])
       console.error('No se pudo guardar el plato', response.error)
       setError('No se pudo guardar el plato. Intenta de nuevo.')
     } else {
@@ -387,9 +453,11 @@ function MenuManager() {
             <label>Descripción<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows="3" placeholder="Ingredientes, tamaño o lo que lo hace especial" /></label>
             <div className="form-row">
               <label>Precio<input required min="0" step="100" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="0" /></label>
-              <label>Imagen (URL)<input type="url" value={form.imagen_url} onChange={(event) => setForm({ ...form, imagen_url: event.target.value })} placeholder="https://... o /imagen.png" /></label>
+              <label>Categoría<select value={form.category_id || ''} onChange={(event) => setForm({ ...form, category_id: event.target.value })}><option value="">Sin categoría</option>{sortedCategories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></label>
             </div>
-            <label>Categoría<select value={form.category_id || ''} onChange={(event) => setForm({ ...form, category_id: event.target.value })}><option value="">Sin categoría</option>{sortedCategories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></label>
+            <label className="menu-file-field">Imagen del plato<input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageChange} /></label>
+            <p className="menu-file-hint">JPG, PNG o WebP · máximo 5 MB. {form.imagen_url && !imageFile ? 'Puedes mantener la actual o elegir otra.' : 'La imagen se sube al guardar el plato.'}</p>
+            {(imagePreview || form.imagen_url) && <button type="button" className="text-button menu-image-remove" onClick={removeImage}>Quitar imagen</button>}
             <label className="menu-availability"><input type="checkbox" checked={form.is_available} onChange={(event) => setForm({ ...form, is_available: event.target.checked })} /> Disponible para pedir</label>
             <div className="menu-form-actions">
               <button className="primary-button" disabled={saving}>{saving ? 'Guardando...' : editingId ? 'Guardar cambios' : 'Agregar al menú'}</button>
@@ -397,7 +465,7 @@ function MenuManager() {
             </div>
           </div>
           <aside className="menu-form-preview" aria-label="Vista previa del plato">
-            <div className="menu-preview-image">{form.imagen_url ? <img src={form.imagen_url} alt="" /> : <span aria-hidden="true">◈</span>}</div>
+            <div className="menu-preview-image">{(imagePreview || form.imagen_url) ? <img src={imagePreview || form.imagen_url} alt="" /> : <span aria-hidden="true">◈</span>}</div>
             <span className="menu-preview-category">{form.category_id ? categoryName(form.category_id) : 'Sin categoría'}</span>
             <strong>{form.name || 'Nombre del plato'}</strong>
             <span className="menu-preview-price">{form.price !== '' ? money.format(Number(form.price) || 0) : 'Precio'}</span>
