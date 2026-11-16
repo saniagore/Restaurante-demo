@@ -24,7 +24,7 @@ Esta guía explica qué se implementó, qué datos faltan por completar y cómo 
 | Flujo de recogida | `src/components/OrdersBoard.jsx`, `src/App.tsx` | Para recoger, `preparing` pasa directo a `completed` y el cliente ve "Listo para recoger". |
 | Categorías del menú | `src/components/MenuManager.jsx`, `src/App.tsx`, `supabase/migrations/20261116040000_create_categories.sql` | El admin crea, renombra, reordena y elimina categorías y asigna cada plato; el menú público las muestra como filtros. |
 | Imágenes de platos | `src/components/MenuManager.jsx`, `supabase/migrations/20261116050000_create_dish_images_bucket.sql` | El admin sube la imagen desde el formulario a Supabase Storage; ya no necesita pegar una URL. |
-| Flujo de caja | `src/components/CashRegister.jsx`, `supabase/migrations/20261117000000_cash_register.sql` | Apertura, ventas en efectivo, ingresos, gastos, retiros y cierre con diferencia. |
+| Flujo de caja | `src/components/CashRegister.jsx`, `supabase/migrations/20261117000000_cash_register.sql`, `20261117020000_cash_transfers.sql` | Apertura, ventas en efectivo y transferencia, ingresos, gastos, retiros y cierre con diferencia. |
 | Estadísticas de productos | `src/components/Statistics.jsx`, `supabase/migrations/20261117010000_dish_costs_statistics.sql` | Ventas, unidades, costo, ganancia y margen por producto; ranking de más vendido y más rentable. |
 
 ## 2. Datos pendientes (marcadores en mayúsculas)
@@ -77,7 +77,7 @@ npx supabase db push
 
 Alternativa: copiar el contenido de cada archivo en el SQL Editor del panel de Supabase, respetando el orden.
 
-**Atajo:** [migraciones-completas.sql](migraciones-completas.sql) reúne en un solo archivo el esquema base mínimo, las 11 migraciones anteriores y estas 9, en orden y de forma idempotente. Es la opción recomendada si prefieres pegar una sola vez en el SQL Editor.
+**Atajo:** [migraciones-completas.sql](migraciones-completas.sql) reúne en un solo archivo el esquema base mínimo, las 11 migraciones anteriores y estas 10, en orden y de forma idempotente. Es la opción recomendada si prefieres pegar una sola vez en el SQL Editor.
 
 1. `20261115000000_order_consent.sql`: agrega columnas y actualiza `create_order_secure`.
 2. `20261115010000_data_retention.sql`: agrega `anonymized_at`, crea las funciones de limpieza y programa `pg_cron`.
@@ -88,6 +88,7 @@ Alternativa: copiar el contenido de cada archivo en el SQL Editor del panel de S
 7. `20261116050000_create_dish_images_bucket.sql`: crea el bucket público `dish-images` (5 MB, JPG/PNG/WebP) y sus políticas de lectura y administración.
 8. `20261117000000_cash_register.sql`: crea las sesiones y movimientos de caja con acceso solo para admin.
 9. `20261117010000_dish_costs_statistics.sql`: agrega `dishes.costo`, guarda `order_items.unit_cost` y rellena los ítems existentes.
+10. `20261117020000_cash_transfers.sql`: separa ventas en efectivo y transferencia en las sesiones de caja y restringe el método de pago.
 
 Notas:
 
@@ -95,7 +96,8 @@ Notas:
 - Para **recoger**, el flujo del panel es Pendientes → Aceptado → Preparando → Completadas (sin pasar por “En camino”); el seguimiento del cliente muestra “Listo para recoger”.
 - Las **categorías** se leen públicamente y solo el admin las gestiona. Al eliminar una categoría, sus platos quedan sin categoría (no se borran) y aparecen en el filtro “Otros” del menú público.
 - Las **imágenes** se suben al bucket público `dish-images`; el bucket acepta JPG, PNG y WebP de hasta 5 MB. Solo un usuario con rol admin puede subir, reemplazar o borrar archivos.
-- La **caja** calcula las ventas en efectivo desde los pedidos completados durante el turno. Solo puede existir una caja abierta; los ingresos, gastos y retiros se registran como movimientos. El cierre guarda esperado, contado y diferencia.
+- La **caja** calcula las ventas en efectivo desde los pedidos completados durante el turno. Solo puede existir una caja abierta; los ingresos, gastos y retiros se registran como movimientos. El cierre guarda efectivo, transferencias, esperado, contado y diferencia.
+- Las **transferencias** se toman de los pedidos marcados con método de pago “Transferencia” en Órdenes. La caja permite alternar entre Total, Efectivo y Transferencias; el cierre físico siempre usa solo el efectivo.
 - Las **estadísticas** usan los pedidos completados y el costo guardado en cada ítem. Si un plato no tiene costo, su ganancia se muestra como ingreso y el panel avisa cuáles completar.
 - El pedido se rechaza con el código `22023` si no incluye teléfono válido, versión legal vigente, más de 50 ítems, platos duplicados o cantidades fuera de 1-99.
 - Si el teléfono o el navegador ya tienen un pedido activo, la RPC responde `Ya tienes un pedido activo` (código `P0001`) y no crea una fila.
@@ -204,6 +206,7 @@ La anonimización solo toca pedidos `completed` o `cancelled`; un pedido en curs
 - [ ] Crear una categoría, mover un plato y comprobar el filtro en el menú público.
 - [ ] Subir una imagen desde el formulario de plato y comprobar que se ve en el menú público.
 - [ ] Abrir caja, registrar un gasto, completar un pedido y cerrar la caja verificando el efectivo esperado.
+- [ ] Marcar un pedido como transferencia y comprobar el cambio Total / Efectivo / Transferencias en Caja.
 - [ ] Cargar el costo de los platos y revisar el ranking de ganancia en Estadísticas.
 - [ ] Confirmar que los buzones `pqrsEmail` y `privacyEmail` existen y tienen responsable asignado.
 - [ ] Probar en producción: carrito → consentimiento sin marcar (debe bloquear) → pedido → seguimiento.

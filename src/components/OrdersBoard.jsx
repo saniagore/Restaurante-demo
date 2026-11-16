@@ -65,6 +65,18 @@ function OrdersBoard({ onOpenHistory }) {
     setUpdating(null)
   }
 
+  async function updatePaymentMethod(order, payment_method) {
+    setUpdating(order.id)
+    const { error: updateError } = await supabase.from('orders').update({ payment_method }).eq('id', order.id)
+    if (updateError) {
+      console.error('No se pudo actualizar el método de pago', updateError)
+      setError('No se pudo actualizar el método de pago.')
+    } else {
+      setOrders((current) => current.map((item) => item.id === order.id ? { ...item, payment_method } : item))
+    }
+    setUpdating(null)
+  }
+
   const groupedOrders = useMemo(() => {
     const knownStatuses = new Set(columns.map((column) => column.key))
     return columns.reduce((result, column) => {
@@ -92,7 +104,7 @@ function OrdersBoard({ onOpenHistory }) {
           return <section className={`order-column ${collapsed ? 'collapsed' : ''}`} key={column.key}>
           <div className="column-heading"><button className="column-toggle" type="button" aria-expanded={!collapsed} onClick={() => setCollapsedColumns((current) => ({ ...current, [column.key]: !current[column.key] }))}><h2><span className={`status-icon ${column.key}`}>{column.icon}</span>{column.label}</h2><span className="count-badge">{groupedOrders[column.key]?.length || 0}</span></button><span className="collapse-icon" aria-hidden="true">{collapsed ? '+' : '−'}</span></div>
           {!collapsed && <div className="order-list">
-            {groupedOrders[column.key]?.map((order) => <OrderCard key={order.id} order={order} column={column} updating={updating} onStatusChange={updateStatus} />)}
+            {groupedOrders[column.key]?.map((order) => <OrderCard key={order.id} order={order} column={column} updating={updating} onStatusChange={updateStatus} onPaymentChange={updatePaymentMethod} />)}
             {!groupedOrders[column.key]?.length && <div className="column-empty">No hay pedidos aquí</div>}
           </div>}
         </section>})}
@@ -101,7 +113,7 @@ function OrdersBoard({ onOpenHistory }) {
   )
 }
 
-function OrderCard({ order, column, updating, onStatusChange }) {
+function OrderCard({ order, column, updating, onStatusChange, onPaymentChange }) {
   const items = order.order_items || order.items || []
   const isPickup = order.order_type !== 'delivery'
   const deliveryLabel = isPickup ? 'Recoger en local' : 'Domicilio'
@@ -117,6 +129,9 @@ function OrderCard({ order, column, updating, onStatusChange }) {
     {expanded && <div className="order-details">
       <div className="items-list">{items.map((item, index) => <div className="order-item" key={item.id || index}><span><b>{item.quantity || 1}×</b> {item.dishes?.nombre || item.name || item.dish_name || 'Producto'}{item.dishes?.descripcion && <small>{item.dishes.descripcion}</small>}</span><span>{money(item.subtotal || item.unit_price * (item.quantity || 1))}</span></div>)}</div>
       {(order.delivery_address || order.notes || order.customer_phone) && <div className="order-notes">{order.customer_phone && <><strong>Teléfono</strong><p>{order.customer_phone}</p></>}{order.delivery_address && <><strong>Dirección</strong><p>{order.delivery_address}</p></>}{order.notes && <><strong>Notas</strong><p>{order.notes}</p></>}</div>}
+      <div className="order-payment">
+        <label>Método de pago<select value={order.payment_method || 'cash'} disabled={updating === order.id} onChange={(event) => onPaymentChange(order, event.target.value)}><option value="cash">Efectivo</option><option value="transfer">Transferencia</option></select></label>
+      </div>
     </div>}
     {nextStatus ? <button className="primary-button order-action" onClick={() => onStatusChange(order, nextStatus)} disabled={updating === order.id}>{updating === order.id ? 'Guardando...' : nextAction} <span>→</span></button> : <span className="completed-label">{isPickup ? 'Pedido listo' : 'Último estado'}</span>}
     {['pending', 'accepted', 'preparing'].includes(column.key) && <button className="text-button order-cancel" disabled={updating === order.id} onClick={() => { if (window.confirm('¿Cancelar este pedido? Se liberará el teléfono del cliente.')) onStatusChange(order, 'cancelled') }}>Cancelar pedido</button>}

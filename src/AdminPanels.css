@@ -254,3 +254,11 @@ select:focus { border-color: var(--orange); box-shadow: 0 0 0 3px #e85d3220; }
 @media (max-width:760px) { .stats-kpis { grid-template-columns:1fr 1fr; } .stats-filter-grid { align-items:stretch; flex-direction:column; } .stats-ranges { margin-left:0; } .stats-ranges button { flex:1; } .stats-panel .panel-heading { padding:16px 16px 0; } }
 
 .cash-hint { color:#85858b; font-size:9px; font-weight:400; }
+
+.cash-mode { display:inline-flex; gap:4px; padding:3px; margin-bottom:6px; background:#f4f2ee; border-radius:9px; }
+.cash-mode button { padding:7px 13px; color:#77767a; background:none; border:0; border-radius:7px; font-size:10px; font-weight:600; }
+.cash-mode button.active { color:var(--orange); background:#fff; box-shadow:0 2px 5px #302b2012; }
+.cash-mode-note { margin:0 0 14px; color:#85858b; font-size:10px; }
+.order-payment { margin-top:10px; padding-top:10px; border-top:1px dashed #e2e0db; }
+.order-payment label { color:#85858b; font-size:9px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+.order-payment select { padding:7px 9px; font-size:10px; }
