@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { CASH_MOVEMENT_LABELS, calculateCashTotals, cashDifference, sanitizeCashAmount } from '../lib/cash'
+import { CASH_MOVEMENT_LABELS, calculateCashTotals, cashDifference } from '../lib/cash'
+import { MoneyInput } from './MoneyInput'
 
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
 const formatDate = (value) => value ? new Date(value).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '—'
@@ -9,19 +10,6 @@ const MOVEMENT_TYPES = [
   { value: 'expense', label: 'Gasto' },
   { value: 'withdrawal', label: 'Retiro' },
 ]
-
-function AmountInput({ value, onChange, ...props }) {
-  return <input
-    {...props}
-    type="text"
-    inputMode="numeric"
-    autoComplete="off"
-    pattern="[0-9]*"
-    maxLength={10}
-    value={value}
-    onChange={(event) => onChange(sanitizeCashAmount(event.target.value))}
-  />
-}
 
 async function fetchCashSales(session) {
   const end = session.closed_at || new Date().toISOString()
@@ -270,7 +258,7 @@ function CashRegister() {
           <div className="panel-heading"><div><h2>Movimientos</h2><p className="muted">Gastos, retiros e ingresos del turno.</p></div></div>
           <form className="cash-form" onSubmit={addMovement}>
             <label>Tipo<select value={movementType} onChange={(event) => setMovementType(event.target.value)}>{MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-            <label>Monto<AmountInput required value={movementAmount} onChange={setMovementAmount} placeholder="0" aria-label="Monto del movimiento" /></label>
+            <label>Monto<MoneyInput required value={movementAmount} onChange={setMovementAmount} placeholder="0" aria-label="Monto del movimiento" /></label>
             <label>Descripción<input value={movementDescription} onChange={(event) => setMovementDescription(event.target.value)} placeholder="Ej. compra de hielo" /></label>
             <button className="primary-button" disabled={working}>Agregar movimiento</button>
           </form>
@@ -287,7 +275,7 @@ function CashRegister() {
         <section className="panel cash-close">
           <div className="panel-heading"><div><h2>Cerrar caja</h2><p className="muted">Cuenta el efectivo físico y registra el cierre.</p></div></div>
           <form className="cash-form" onSubmit={closeCash}>
-            <label>Efectivo contado<AmountInput required value={countedAmount} onChange={setCountedAmount} placeholder="0" aria-label="Efectivo contado" /></label>
+            <label>Efectivo contado<MoneyInput required value={countedAmount} onChange={setCountedAmount} placeholder="0" aria-label="Efectivo contado" /></label>
             <label>Notas del cierre<textarea rows="3" value={closingNotes} onChange={(event) => setClosingNotes(event.target.value)} placeholder="Novedades, faltantes o sobrantes..." /></label>
             <div className="cash-difference"><span>Diferencia estimada</span><strong className={estimatedDifference === 0 ? '' : estimatedDifference > 0 ? 'positive' : 'negative'}>{money.format(estimatedDifference)}</strong></div>
             <button className="primary-button" disabled={working || sales.error || !countedAmount}>Cerrar caja</button>
@@ -308,7 +296,7 @@ function CashRegister() {
       <section className="panel cash-open">
         <div className="panel-heading"><div><h2>Abrir caja</h2><p className="muted">Registra la base inicial del turno.</p></div></div>
         <form className="cash-form cash-open-form" onSubmit={openCash}>
-          <label>Base inicial<AmountInput required value={openingAmount} onChange={setOpeningAmount} placeholder="0" aria-label="Base inicial" /><small className="cash-hint">Solo números: puedes escribir 150000 o 150.000.</small></label>
+          <label>Base inicial<MoneyInput required value={openingAmount} onChange={setOpeningAmount} placeholder="0" aria-label="Base inicial" /><small className="cash-hint">Solo números: puedes escribir 150000 o 150.000.</small></label>
           <label>Notas de apertura<input value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ej. turno de la mañana" /></label>
           <button className="primary-button" disabled={working}>Abrir caja</button>
         </form>
