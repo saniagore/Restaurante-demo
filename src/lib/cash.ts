@@ -25,6 +25,11 @@ export function cashDifference(counted: number, expected: number): number {
   return (Number(counted) || 0) - (Number(expected) || 0)
 }
 
+/** Deja solo dígitos y limita a 10 enteros para que quepa en numeric(12,2). */
+export function sanitizeCashAmount(value: string): string {
+  return String(value ?? '').replace(/\D/g, '').slice(0, 10)
+}
+
 export const CASH_MOVEMENT_LABELS: Record<string, string> = {
   income: 'Ingreso',
   expense: 'Gasto',
