@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { buildDishImagePath, validateImageFile } from '../lib/image-upload'
+import { MoneyInput } from './MoneyInput'
 
 const emptyDish = { name: '', description: '', price: '', costo: '', imagen_url: '', is_available: true, category_id: '' }
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
@@ -389,7 +390,7 @@ function MenuManager() {
       <article><span>Precio promedio</span><strong>{money.format(average)}</strong></article>
       <article className="menu-fee-card">
         <div><span>Domicilio</span><small>Se suma a los pedidos a domicilio</small></div>
-        <form onSubmit={saveDeliveryFee}><input aria-label="Tarifa de domicilio" min="0" step="100" type="number" value={deliveryFee} onChange={(event) => setDeliveryFee(event.target.value)} /><button className="secondary-button" disabled={savingFee}>{savingFee ? '...' : 'Guardar'}</button>{feeSaved && <em>Guardado</em>}</form>
+        <form onSubmit={saveDeliveryFee}><MoneyInput aria-label="Tarifa de domicilio" value={deliveryFee} onChange={setDeliveryFee} placeholder="0" /><button className="secondary-button" disabled={savingFee}>{savingFee ? '...' : 'Guardar'}</button>{feeSaved && <em>Guardado</em>}</form>
       </article>
     </section>
 
@@ -459,8 +460,8 @@ function MenuManager() {
             <label>Nombre del plato<input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Ej. Hamburguesa clásica" /></label>
             <label>Descripción<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows="3" placeholder="Ingredientes, tamaño o lo que lo hace especial" /></label>
             <div className="form-row">
-              <label>Precio<input required min="0" step="100" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="0" /></label>
-              <label>Costo por plato<input min="0" step="100" type="number" value={form.costo ?? ''} onChange={(event) => setForm({ ...form, costo: event.target.value })} placeholder="Opcional" /></label>
+              <label>Precio<MoneyInput required value={form.price} onChange={(value) => setForm({ ...form, price: value })} placeholder="0" aria-label="Precio" /></label>
+              <label>Costo por plato<MoneyInput value={form.costo ?? ''} onChange={(value) => setForm({ ...form, costo: value })} placeholder="Opcional" aria-label="Costo por plato" /></label>
             </div>
             <label>Categoría<select value={form.category_id || ''} onChange={(event) => setForm({ ...form, category_id: event.target.value })}><option value="">Sin categoría</option>{sortedCategories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}</select></label>
             <p className="menu-file-hint">El costo es opcional; se usa para calcular la ganancia en Estadísticas.</p>
