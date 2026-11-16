@@ -53,6 +53,8 @@ function MenuPage({ navigate }: { navigate: (to: string) => void }) {
   const [menuLoading, setMenuLoading] = useState(true)
   const [cartOpen, setCartOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [categories, setCategories] = useState<{ id: string; nombre: string; orden: number }[]>([])
+  const [activeCategory, setActiveCategory] = useState('')
   const items = useCart((state) => state.items)
   const cartTotal = useCart((state) => state.total())
   const addItem = useCart((state) => state.addItem)
@@ -66,7 +68,7 @@ function MenuPage({ navigate }: { navigate: (to: string) => void }) {
     }
     const { data, error } = await supabase
       .from('dishes')
-      .select('id,nombre,descripcion,precio,imagen_url')
+      .select('id,nombre,descripcion,precio,imagen_url,category_id')
       .eq('is_available', true)
       .order('nombre')
     if (error) {
@@ -78,22 +80,34 @@ function MenuPage({ navigate }: { navigate: (to: string) => void }) {
           description: dish.descripcion || '',
           price: Number(dish.precio),
           image_url: dish.imagen_url || '',
+          category_id: dish.category_id || null,
       })))
     }
     setMenuLoading(false)
   }, [])
   useEffect(() => { loadDishes() }, [loadDishes])
+  useEffect(() => {
+    if (!supabase) return
+    supabase.from('categories').select('id,nombre,orden').order('orden').then(({ data, error }) => {
+      if (!error) setCategories(data || [])
+    })
+  }, [])
   const visible = dishes.filter((dish) => {
     const matchesSearch = `${dish.name} ${dish.description}`.toLowerCase().includes(search.toLowerCase())
-    return matchesSearch
+    const matchesCategory = !activeCategory || (activeCategory === 'none' ? !dish.category_id : dish.category_id === activeCategory)
+    return matchesSearch && matchesCategory
   })
+  const categoriesWithDishes = categories.filter((category) => dishes.some((dish) => dish.category_id === category.id))
+  const hasUncategorized = dishes.some((dish) => !dish.category_id)
+  const categoryName = (id?: string | null) => categories.find((category) => category.id === id)?.nombre || ''
   return <div className="app-shell">
     <header className="topbar"><a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/') }}><span className="brand-mark">M</span><span>{business.brand}<small>{business.tagline}</small></span></a><nav><a href="#menu">Menú</a><a href="#about">El restaurante</a></nav><button className="cart-button" onClick={() => setCartOpen(true)} aria-label="Abrir carrito"><Icon name="bag" /><span>Tu pedido</span>{items.length > 0 && <b>{items.reduce((sum, item) => sum + item.quantity, 0)}</b>}</button></header>
     <ActiveOrderBanner onOpen={(token) => navigate(`/track/${token}`)} />
     <main>
       <section className="hero-section"><div className="hero-copy"><p className="eyebrow">SABORES PARA COMPARTIR</p><h1>Un buen momento<br /><em>empieza en la mesa.</em></h1><p className="hero-description">Ingredientes frescos, recetas hechas con cuidado y opciones para disfrutar a tu manera.</p><a className="gold-button" href="#menu">Explorar el menú <Icon name="arrow" size={16} /></a></div><div className="hero-art"><img src={heroImage} alt="Plato preparado para compartir" /></div></section>
       <section id="menu" className="menu-section"><div className="section-heading"><div><p className="eyebrow">NUESTRO MENÚ</p><h2>Elige algo delicioso</h2></div><label className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el menú" aria-label="Buscar en el menú" /></label></div>
-        {menuLoading ? <div className="loading" aria-live="polite">Cargando el menú...</div> : menuError ? <div className="empty-search"><p>{menuError}</p><button className="outline-button retry-button" onClick={loadDishes}>Reintentar</button></div> : <div className="dish-grid">{visible.map((dish) => <DishCard key={dish.id} dish={dish} onAdd={() => addItem(dish)} />)}</div>}{!menuLoading && !menuError && visible.length === 0 && <div className="empty-search">No encontramos ese plato. Intenta con otra búsqueda.</div>}
+        {(categoriesWithDishes.length > 0 || hasUncategorized) && <div className="category-row" role="tablist" aria-label="Categorías del menú"><button type="button" role="tab" aria-selected={!activeCategory} className={!activeCategory ? 'active' : ''} onClick={() => setActiveCategory('')}>Todos</button>{categoriesWithDishes.map((category) => <button type="button" role="tab" key={category.id} aria-selected={activeCategory === category.id} className={activeCategory === category.id ? 'active' : ''} onClick={() => setActiveCategory(category.id)}>{category.nombre}</button>)}{hasUncategorized && <button type="button" role="tab" aria-selected={activeCategory === 'none'} className={activeCategory === 'none' ? 'active' : ''} onClick={() => setActiveCategory('none')}>Otros</button>}</div>}
+        {menuLoading ? <div className="loading" aria-live="polite">Cargando el menú...</div> : menuError ? <div className="empty-search"><p>{menuError}</p><button className="outline-button retry-button" onClick={loadDishes}>Reintentar</button></div> : <div className="dish-grid">{visible.map((dish) => <DishCard key={dish.id} dish={dish} category={categoryName(dish.category_id)} onAdd={() => addItem(dish)} />)}</div>}{!menuLoading && !menuError && visible.length === 0 && <div className="empty-search">{search ? 'No encontramos ese plato. Intenta con otra búsqueda.' : activeCategory ? 'No hay platos disponibles en esta categoría.' : 'No hay platos disponibles por ahora.'}</div>}
       </section>
     </main>
     <SiteFooter onNavigate={navigate} />
@@ -103,8 +117,8 @@ function MenuPage({ navigate }: { navigate: (to: string) => void }) {
   </div>
 }
 
-function DishCard({ dish, onAdd }: { dish: Dish; onAdd: () => void }) {
-  return <article className="dish-card"><div className="dish-image"><img src={dish.image_url} alt={dish.name} loading="lazy" referrerPolicy="no-referrer" /><button className="add-button" onClick={onAdd} aria-label={`Añadir ${dish.name}`}><Icon name="plus" size={19} /></button></div><div className="dish-info"><div><h3>{dish.name}</h3><span className="price">{money.format(dish.price)}</span></div><p>{dish.description}</p></div></article>
+function DishCard({ dish, category, onAdd }: { dish: Dish; category?: string; onAdd: () => void }) {
+  return <article className="dish-card"><div className="dish-image"><img src={dish.image_url} alt={dish.name} loading="lazy" referrerPolicy="no-referrer" /><button className="add-button" onClick={onAdd} aria-label={`Añadir ${dish.name}`}><Icon name="plus" size={19} /></button></div><div className="dish-info">{category && <span className="dish-category">{category}</span>}<div><h3>{dish.name}</h3><span className="price">{money.format(dish.price)}</span></div><p>{dish.description}</p></div></article>
 }
 
 function CartDrawer({ close, navigate }: { close: () => void; navigate: (to: string) => void }) {

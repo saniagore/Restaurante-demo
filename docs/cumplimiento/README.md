@@ -22,6 +22,7 @@ Esta guía explica qué se implementó, qué datos faltan por completar y cómo 
 | Pedido único y teléfono | `src/App.tsx`, `src/lib/customer-session.ts`, `supabase/migrations/20261116000000_add_phone_single_active_order.sql` | Teléfono obligatorio en recogida y domicilio; un solo pedido activo por teléfono y por navegador. |
 | Cancelación e historial | `src/components/OrdersBoard.jsx`, `supabase/migrations/20261116010000_cancel_orders_and_history.sql` | Estado `cancelled`, botón de cancelación, historial de estados y vencimiento de pedidos pendientes. |
 | Flujo de recogida | `src/components/OrdersBoard.jsx`, `src/App.tsx` | Para recoger, `preparing` pasa directo a `completed` y el cliente ve "Listo para recoger". |
+| Categorías del menú | `src/components/MenuManager.jsx`, `src/App.tsx`, `supabase/migrations/20261116040000_create_categories.sql` | El admin crea, renombra, reordena y elimina categorías y asigna cada plato; el menú público las muestra como filtros. |
 
 ## 2. Datos pendientes (marcadores en mayúsculas)
 
@@ -73,18 +74,20 @@ npx supabase db push
 
 Alternativa: copiar el contenido de cada archivo en el SQL Editor del panel de Supabase, respetando el orden.
 
-**Atajo:** [migraciones-completas.sql](migraciones-completas.sql) reúne en un solo archivo el esquema base mínimo, las 11 migraciones anteriores y estas 5, en orden y de forma idempotente. Es la opción recomendada si prefieres pegar una sola vez en el SQL Editor.
+**Atajo:** [migraciones-completas.sql](migraciones-completas.sql) reúne en un solo archivo el esquema base mínimo, las 11 migraciones anteriores y estas 6, en orden y de forma idempotente. Es la opción recomendada si prefieres pegar una sola vez en el SQL Editor.
 
 1. `20261115000000_order_consent.sql`: agrega columnas y actualiza `create_order_secure`.
 2. `20261115010000_data_retention.sql`: agrega `anonymized_at`, crea las funciones de limpieza y programa `pg_cron`.
 3. `20261116000000_add_phone_single_active_order.sql`: agrega teléfono, identificador de navegador, token de idempotencia, tope de ítems, validación de cantidades, versión legal y límite global.
 4. `20261116010000_cancel_orders_and_history.sql`: agrega el estado `cancelled`, el historial de estados y el vencimiento automático de pedidos pendientes.
 5. `20261116030000_add_pickup_order_type.sql`: agrega el valor `pickup` al enum `order_type` en las bases donde falte (necesario para pedidos para recoger).
+6. `20261116040000_create_categories.sql`: crea `categories`, agrega `dishes.category_id`, define RLS y siembra las categorías iniciales del menú.
 
 Notas:
 
 - La regla de pedido único **no depende del nombre del estado inicial**: `is_active` se calcula comparando el estado como texto, así que funciona igual si tu enum usa `pending`, `received` u otro valor.
 - Para **recoger**, el flujo del panel es Pendientes → Aceptado → Preparando → Completadas (sin pasar por “En camino”); el seguimiento del cliente muestra “Listo para recoger”.
+- Las **categorías** se leen públicamente y solo el admin las gestiona. Al eliminar una categoría, sus platos quedan sin categoría (no se borran) y aparecen en el filtro “Otros” del menú público.
 - El pedido se rechaza con el código `22023` si no incluye teléfono válido, versión legal vigente, más de 50 ítems, platos duplicados o cantidades fuera de 1-99.
 - Si el teléfono o el navegador ya tienen un pedido activo, la RPC responde `Ya tienes un pedido activo` (código `P0001`) y no crea una fila.
 - El mismo `client_token` devuelve el pedido ya creado: reintentar no duplica.
@@ -189,6 +192,7 @@ La anonimización solo toca pedidos `completed` o `cancelled`; un pedido en curs
 - [ ] Aplicar las cuatro migraciones (o el archivo único) y ejecutar la verificación de la sección 5.
 - [ ] Probar que un segundo pedido con el mismo teléfono o navegador se rechace y que cancelar lo libere.
 - [ ] Probar un pedido para recoger de punta a punta: debe poder pasar de Preparando a Completadas y el cliente debe ver "Listo para recoger".
+- [ ] Crear una categoría, mover un plato y comprobar el filtro en el menú público.
 - [ ] Confirmar que los buzones `pqrsEmail` y `privacyEmail` existen y tienen responsable asignado.
 - [ ] Probar en producción: carrito → consentimiento sin marcar (debe bloquear) → pedido → seguimiento.
 - [ ] Verificar que la CSP no bloquee Supabase (REST, Realtime del panel) ni las imágenes del menú.

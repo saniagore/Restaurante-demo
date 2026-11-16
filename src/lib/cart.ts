@@ -8,6 +8,7 @@ export type Dish = {
   price: number
   image_url: string
   category?: string
+  category_id?: string | null
 }
 
 export type CartItem = Dish & { quantity: number }
