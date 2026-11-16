@@ -31,6 +31,8 @@ function MenuManager() {
   const [newCategory, setNewCategory] = useState('')
   const [editingCategoryId, setEditingCategoryId] = useState(null)
   const [editingCategoryName, setEditingCategoryName] = useState('')
+  const [draggingCategoryId, setDraggingCategoryId] = useState(null)
+  const [dragOverCategoryId, setDragOverCategoryId] = useState(null)
   const formRef = useRef(null)
 
   useEffect(() => {
@@ -213,14 +215,7 @@ function MenuManager() {
     setEditingCategoryName('')
   }
 
-  async function moveCategory(category, direction) {
-    const ordered = sortCategories(categories)
-    const index = ordered.findIndex((item) => item.id === category.id)
-    const target = index + direction
-    if (target < 0 || target >= ordered.length) return
-    const reordered = [...ordered]
-    const [moved] = reordered.splice(index, 1)
-    reordered.splice(target, 0, moved)
+  async function persistCategoryOrder(reordered) {
     const results = await Promise.all(reordered.map((item, position) =>
       supabase.from('categories').update({ orden: (position + 1) * 10 }).eq('id', item.id),
     ))
@@ -231,6 +226,63 @@ function MenuManager() {
       return
     }
     setCategories(reordered.map((item, position) => ({ ...item, orden: (position + 1) * 10 })))
+  }
+
+  async function reorderCategories(draggedId, targetId) {
+    if (!draggedId || !targetId || draggedId === targetId) return
+    const ordered = sortCategories(categories)
+    const from = ordered.findIndex((category) => category.id === draggedId)
+    const to = ordered.findIndex((category) => category.id === targetId)
+    if (from < 0 || to < 0) return
+    const reordered = [...ordered]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    await persistCategoryOrder(reordered)
+  }
+
+  async function moveCategory(category, direction) {
+    const ordered = sortCategories(categories)
+    const index = ordered.findIndex((item) => item.id === category.id)
+    const target = ordered[index + direction]
+    if (!target) return
+    await reorderCategories(category.id, target.id)
+  }
+
+  function handleDragStart(event, category) {
+    if (event.target.closest('button:not(.category-drag), input, select, textarea')) {
+      event.preventDefault()
+      return
+    }
+    setDraggingCategoryId(category.id)
+    setDragOverCategoryId(null)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', category.id)
+  }
+
+  function handleDragOver(event, category) {
+    if (!draggingCategoryId || draggingCategoryId === category.id) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverCategoryId(category.id)
+  }
+
+  function handleDragLeave(event, category) {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setDragOverCategoryId((current) => current === category.id ? null : current)
+    }
+  }
+
+  async function handleDrop(event, category) {
+    event.preventDefault()
+    const draggedId = draggingCategoryId || event.dataTransfer.getData('text/plain')
+    setDraggingCategoryId(null)
+    setDragOverCategoryId(null)
+    await reorderCategories(draggedId, category.id)
+  }
+
+  function handleDragEnd() {
+    setDraggingCategoryId(null)
+    setDragOverCategoryId(null)
   }
 
   async function deleteCategory(category) {
@@ -269,24 +321,46 @@ function MenuManager() {
     </section>
 
     <section className="panel category-manager">
-      <div className="panel-heading"><div><h2>Categorías</h2><p className="muted">Agrupa el menú y asigna cada plato desde su formulario.</p></div><span className="dish-count">{categories.length} {categories.length === 1 ? 'categoría' : 'categorías'}</span></div>
+      <div className="panel-heading"><div><h2>Categorías</h2><p className="muted">Arrastra las categorías para ordenarlas y asigna los platos desde su formulario.</p></div><span className="dish-count">{categories.length} {categories.length === 1 ? 'categoría' : 'categorías'}</span></div>
       <form className="category-add" onSubmit={addCategory}>
         <input value={newCategory} onChange={(event) => setNewCategory(event.target.value)} placeholder="Nueva categoría, por ejemplo Postres" aria-label="Nueva categoría" maxLength={60} />
         <button className="secondary-button" disabled={!newCategory.trim()}>Agregar</button>
       </form>
       <div className="category-list">
-        {sortedCategories.map((category, index) => <div className="category-row-item" key={category.id}>
+        {sortedCategories.map((category, index) => <div
+          className={`category-row-item ${draggingCategoryId === category.id ? 'dragging' : ''} ${dragOverCategoryId === category.id ? 'drag-over' : ''}`}
+          key={category.id}
+          draggable={editingCategoryId !== category.id}
+          onDragStart={(event) => handleDragStart(event, category)}
+          onDragOver={(event) => handleDragOver(event, category)}
+          onDragLeave={(event) => handleDragLeave(event, category)}
+          onDrop={(event) => handleDrop(event, category)}
+          onDragEnd={handleDragEnd}
+        >
           <span className="category-dot" aria-hidden="true" />
           {editingCategoryId === category.id ? <form className="category-edit" onSubmit={saveCategoryName}>
             <input autoFocus value={editingCategoryName} onChange={(event) => setEditingCategoryName(event.target.value)} aria-label={`Nuevo nombre para ${category.nombre}`} maxLength={60} />
             <button className="secondary-button">Guardar</button>
             <button type="button" className="text-button" onClick={() => { setEditingCategoryId(null); setEditingCategoryName('') }}>Cancelar</button>
           </form> : <>
+            <span
+              role="button"
+              tabIndex={0}
+              className="category-drag"
+              aria-label={`Reordenar ${category.nombre}: arrastra o usa las flechas del teclado`}
+              title="Arrastra para reordenar"
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowUp') { event.preventDefault(); moveCategory(category, -1) }
+                if (event.key === 'ArrowDown') { event.preventDefault(); moveCategory(category, 1) }
+              }}
+            >⠿</span>
             <strong>{category.nombre}</strong>
             <small>{categoryCounts.get(category.id) || 0} {categoryCounts.get(category.id) === 1 ? 'plato' : 'platos'}</small>
             <div className="category-actions">
-              <button className="text-button" disabled={index === 0} onClick={() => moveCategory(category, -1)} aria-label={`Subir ${category.nombre}`}>↑</button>
-              <button className="text-button" disabled={index === sortedCategories.length - 1} onClick={() => moveCategory(category, 1)} aria-label={`Bajar ${category.nombre}`}>↓</button>
+              <span className="category-move">
+                <button className="text-button" disabled={index === 0} onClick={() => moveCategory(category, -1)} aria-label={`Mover ${category.nombre} arriba`}>↑</button>
+                <button className="text-button" disabled={index === sortedCategories.length - 1} onClick={() => moveCategory(category, 1)} aria-label={`Mover ${category.nombre} abajo`}>↓</button>
+              </span>
               <button className="text-button" onClick={() => startEditingCategory(category)}>Editar</button>
               <button className="text-button" onClick={() => deleteCategory(category)}>Eliminar</button>
             </div>
