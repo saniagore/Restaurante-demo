@@ -122,7 +122,7 @@ function OrderCard({ order, column, updating, onStatusChange, onPaymentChange })
   const [expanded, setExpanded] = useState(false)
   return <article className="order-card">
     <button className="order-card-summary" type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>
-      <div className="order-card-top"><strong>#{String(order.id).slice(-5)}</strong><time>{formatTime(order.created_at)}</time></div>
+      <div className="order-card-top"><strong>#{String(order.id).slice(-5)}</strong><span className={order.payment_method === 'transfer' ? 'order-pay-badge transfer' : 'order-pay-badge'}>{order.payment_method === 'transfer' ? 'Transferencia' : 'Efectivo'}</span><time>{formatTime(order.created_at)}</time></div>
       <div className="customer-row"><p className="customer-name">{order.customer_name || order.name || 'Cliente'}</p><span className="order-type">{deliveryLabel}</span></div>
       <div className="summary-total"><span>Total</span><strong>{money(order.total_amount || order.total)}</strong><span className="expand-icon">{expanded ? '−' : '+'}</span></div>
     </button>

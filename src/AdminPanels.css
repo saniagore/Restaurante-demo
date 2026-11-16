@@ -262,3 +262,7 @@ select:focus { border-color: var(--orange); box-shadow: 0 0 0 3px #e85d3220; }
 .order-payment { margin-top:10px; padding-top:10px; border-top:1px dashed #e2e0db; }
 .order-payment label { color:#85858b; font-size:9px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
 .order-payment select { padding:7px 9px; font-size:10px; }
+
+.order-pay-badge { padding:3px 7px; color:#6f6e73; background:#f2f0ec; border-radius:20px; font-size:8px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+.order-pay-badge.transfer { color:#245f8f; background:#e8f2fc; }
+.cash-info { color:#7a5a1f !important; background:#fff9e9 !important; font-size:10px; }
