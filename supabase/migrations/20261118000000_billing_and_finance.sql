@@ -323,3 +323,7 @@ alter table public.cash_movements
   );
 
 comment on column public.cash_movements.category is 'Categoría del gasto operativo para el resumen diario.';
+
+-- PostgREST puede seguir respondiendo PGRST202 (función no encontrada) con la
+-- caché anterior. Forzar la recarga evita tener que reiniciar la API.
+notify pgrst, 'reload schema';

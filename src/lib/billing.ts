@@ -366,7 +366,7 @@ export function isMissingTableError(error: unknown): boolean {
   if (!value) return false
   return value.code === '42P01'
     || value.code === 'PGRST205'
-    || /could not find the table|relation .* does not exist|schema cache/i.test(value.message ?? '')
+    || /could not find the table|relation .* does not exist/i.test(value.message ?? '')
 }
 
 /** Tabla, columna o función que aún no existe porque falta aplicar la migración. */

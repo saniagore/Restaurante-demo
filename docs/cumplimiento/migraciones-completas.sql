@@ -1492,3 +1492,13 @@ alter table public.cash_movements
   );
 
 comment on column public.cash_movements.category is 'Categoría del gasto operativo para el resumen diario.';
+
+-- ============================================================================
+-- 20. RECARGA DE CACHE DE POSTGREST
+-- ============================================================================
+
+-- Si el panel muestra que falta la migración de facturación pero las tablas y
+-- funciones ya existen, PostgREST conserva la cache anterior y responde
+-- PGRST202. Esta sentencia refresca el esquema sin reiniciar el proyecto.
+
+notify pgrst, 'reload schema';

@@ -25,6 +25,13 @@ import PrintDialog from './PrintDialog'
 
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
 const formatDate = (value) => value ? new Date(value).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '—'
+const SUPABASE_HOST = (() => {
+  try {
+    return new URL(import.meta.env.VITE_SUPABASE_URL || '').host || 'sin configurar'
+  } catch {
+    return 'sin configurar'
+  }
+})()
 const sum = (items, selector) => items.reduce((total, item) => total + (Number(selector(item)) || 0), 0)
 const lastDaysIso = (days) => {
   const date = new Date()
@@ -106,6 +113,7 @@ function InvoicesTab({ settings, refreshToken }) {
   const [notice, setNotice] = useState('')
   const [issuing, setIssuing] = useState(null)
   const [modalError, setModalError] = useState('')
+  const [modalDetail, setModalDetail] = useState(null)
   const [print, setPrint] = useState(null)
   const [working, setWorking] = useState(false)
 
@@ -164,6 +172,7 @@ function InvoicesTab({ settings, refreshToken }) {
     event.preventDefault()
     if (!issuing) return
     setModalError('')
+    setModalDetail(null)
     setWorking(true)
     const { data, error: rpcError } = await supabase.rpc('create_invoice', {
       p_order_id: issuing.id,
@@ -176,6 +185,12 @@ function InvoicesTab({ settings, refreshToken }) {
     if (rpcError) {
       console.error('No se pudo emitir la factura', rpcError)
       setModalError(paymentErrorMessage(rpcError))
+      setModalDetail({
+        code: rpcError.code || 'sin código',
+        message: rpcError.message || 'Sin mensaje del servidor',
+        details: rpcError.details || '',
+        hint: rpcError.hint || '',
+      })
       setWorking(false)
       return
     }
@@ -189,6 +204,7 @@ function InvoicesTab({ settings, refreshToken }) {
 
   function openIssueModal(order) {
     setModalError('')
+    setModalDetail(null)
     setNotice('')
     setIssuing({
       order,
@@ -326,10 +342,18 @@ function InvoicesTab({ settings, refreshToken }) {
             <div><span>Impuesto ({taxRatePercent(rate)})</span><strong>{money.format(preview.tax)}</strong></div>
             <div><span>Total</span><strong>{money.format(preview.total)}</strong></div>
           </div>
-          {modalError && <div className="alert billing-form-wide" role="alert">{modalError}<button type="button" aria-label="Cerrar alerta" onClick={() => setModalError('')}>×</button></div>}
+          {modalError && <div className="alert billing-form-wide" role="alert">{modalError}<button type="button" aria-label="Cerrar alerta" onClick={() => { setModalError(''); setModalDetail(null) }}>×</button></div>}
+          {modalDetail && <details className="billing-error-detail billing-form-wide">
+            <summary>Detalle técnico del error</summary>
+            <code>{modalDetail.code}: {modalDetail.message}</code>
+            {modalDetail.details && <code>{modalDetail.details}</code>}
+            {modalDetail.hint && <code>Hint: {modalDetail.hint}</code>}
+            <small>Proyecto Supabase: {SUPABASE_HOST}</small>
+            <small>Si la migración ya está aplicada, ejecuta en el SQL Editor: <code>notify pgrst, &apos;reload schema&apos;;</code></small>
+          </details>}
           <footer className="billing-modal-actions billing-form-wide">
             <button type="button" className="secondary-button" onClick={() => setIssuing(null)}>Cancelar</button>
-            <button className="primary-button" disabled={working}>{working ? 'Emitiendo...' : 'Emitir e imprimir'}</button>
+            <button className="primary-button" disabled={working}>{working ? 'Emitiendo...' : modalError ? 'Reintentar emisión' : 'Emitir e imprimir'}</button>
           </footer>
         </form>
       </section>
