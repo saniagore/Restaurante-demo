@@ -340,10 +340,11 @@ function CashRegister() {
       <section className="panel cash-open">
         <div className="panel-heading"><div><h2>Abrir caja</h2><p className="muted">Registra la base inicial del turno.</p></div></div>
         <form className="cash-form cash-open-form" onSubmit={openCash}>
-          <label>Base inicial<MoneyInput required value={openingAmount} onChange={setOpeningAmount} placeholder="0" aria-label="Base inicial" /><small className="cash-hint">Solo números: puedes escribir 150000 o 150.000.</small></label>
+          <label>Base inicial<MoneyInput required value={openingAmount} onChange={setOpeningAmount} placeholder="0" aria-label="Base inicial" /></label>
           <label>Notas de apertura<input value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ej. turno de la mañana" /></label>
           <button className="primary-button" disabled={working}>Abrir caja</button>
         </form>
+        <p className="cash-hint cash-open-hint">Solo números: puedes escribir 150000 o 150.000.</p>
       </section>
     </>}
 

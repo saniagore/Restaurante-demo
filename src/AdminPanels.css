@@ -595,8 +595,10 @@ select:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-g
   display: grid;
   grid-template-columns: 1fr 1.4fr auto;
   gap: 14px;
-  align-items: flex-end;
+  align-items: end;
 }
+.cash-open-form .primary-button { margin-top: 0; }
+.cash-open-hint { margin: 10px 0 0; }
 .cash-movements {
   display: grid;
   gap: 6px;
@@ -923,6 +925,7 @@ select:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-g
   .cash-summary { grid-template-columns: repeat(3, 1fr); }
   .cash-layout { grid-template-columns: 1fr; }
   .cash-open-form { grid-template-columns: 1fr 1fr; }
+  .cash-open-form .primary-button { grid-column: 1 / -1; justify-self: start; width: auto; }
   .stats-kpis { grid-template-columns: repeat(3, 1fr); }
   .stats-tops { grid-template-columns: 1fr; }
 }
