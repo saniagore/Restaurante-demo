@@ -175,7 +175,7 @@ function InvoicesTab({ settings, refreshToken }) {
     setModalDetail(null)
     setWorking(true)
     const { data, error: rpcError } = await supabase.rpc('create_invoice', {
-      p_order_id: issuing.id,
+      p_order_id: issuing.order.id,
       p_customer_name: issuing.customerName,
       p_customer_tax_id: issuing.taxId || null,
       p_customer_email: issuing.email || null,

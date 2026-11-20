@@ -5,7 +5,21 @@ import Billing from '../src/components/Billing'
 import PaymentSplit from '../src/components/PaymentSplit'
 import PrintDialog from '../src/components/PrintDialog'
 
+const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }))
+
 vi.mock('../src/lib/supabase', () => {
+  const completedOrder = {
+    id: 'order-1',
+    track_token: 'abc123',
+    customer_name: 'Ana',
+    total: 108000,
+    status: 'completed',
+    created_at: '2026-11-20T12:00:00-05:00',
+    order_type: 'pickup',
+    notes: '',
+    order_items: [],
+    order_payments: [],
+  }
   const query = () => {
     const q: Record<string, unknown> = {}
     Object.assign(q, {
@@ -15,13 +29,13 @@ vi.mock('../src/lib/supabase', () => {
       gte: () => q,
       lt: () => q,
       neq: () => q,
-      limit: () => Promise.resolve({ data: [], error: null }),
+      limit: () => Promise.resolve({ data: [completedOrder], error: null }),
       maybeSingle: () => Promise.resolve({ data: null, error: null }),
-      then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve, reject),
+      then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve({ data: [completedOrder], error: null }).then(resolve, reject),
     })
     return q
   }
-  return { supabase: { from: vi.fn(() => query()), rpc: vi.fn() } }
+  return { supabase: { from: vi.fn(() => query()), rpc: rpcMock } }
 })
 
 const order = {
@@ -61,6 +75,21 @@ describe('diálogo de impresión', () => {
     expect(screen.getByRole('heading', { name: /comanda para cocina/i })).toBeInTheDocument()
     expect(screen.getByTitle(/vista previa/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /imprimir 80 mm/i })).toBeInTheDocument()
+  })
+})
+
+describe('emisión de factura', () => {
+  it('envía el id del pedido seleccionado a la RPC', async () => {
+    rpcMock.mockClear()
+    rpcMock.mockResolvedValue({ data: null, error: null })
+    const user = userEvent.setup()
+    render(<Billing />)
+
+    await screen.findByText('Documentos emitidos')
+    await user.click(await screen.findByRole('button', { name: /emitir documento/i }))
+    await user.click(await screen.findByRole('button', { name: /emitir e imprimir/i }))
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('create_invoice', expect.objectContaining({ p_order_id: 'order-1' })))
   })
 })
 
