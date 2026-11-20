@@ -25,32 +25,10 @@ export function cashDifference(counted: number, expected: number): number {
   return (Number(counted) || 0) - (Number(expected) || 0)
 }
 
-export type SaleLike = { total?: number | null; payment_method?: string | null }
-
-export type SalesSummary = {
-  cashTotal: number
-  transferTotal: number
-  cashCount: number
-  transferCount: number
-}
-
-export function summarizeSales(orders: SaleLike[]): SalesSummary {
-  let cashTotal = 0
-  let transferTotal = 0
-  let cashCount = 0
-  let transferCount = 0
-  for (const order of orders) {
-    const amount = Number(order.total) || 0
-    if (order.payment_method === 'transfer') {
-      transferTotal += amount
-      transferCount += 1
-    } else {
-      cashTotal += amount
-      cashCount += 1
-    }
-  }
-  return { cashTotal, transferTotal, cashCount, transferCount }
-}
+// Las ventas del turno se dividen en `billing.ts`, que entiende los pagos
+// mixtos por pedido y conserva el comportamiento histórico de payment_method.
+export { summarizeSales } from './billing'
+export type { SaleLike, SalesSummary } from './billing'
 
 export { sanitizeAmount as sanitizeCashAmount } from './money'
 

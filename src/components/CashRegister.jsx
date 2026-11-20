@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { CASH_MOVEMENT_LABELS, calculateCashTotals, cashDifference, summarizeSales } from '../lib/cash'
+import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from '../lib/billing'
 import { MoneyInput } from './MoneyInput'
 
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
@@ -19,7 +20,7 @@ async function fetchCashSales(session) {
   const end = session.closed_at || new Date().toISOString()
   const { data, error } = await supabase
     .from('order_status_history')
-    .select('order_id, changed_at, orders(total, payment_method)')
+    .select('order_id, changed_at, orders(total, payment_method, order_payments(method, amount))')
     .eq('to_status', 'completed')
     .gte('changed_at', session.opened_at)
     .lte('changed_at', end)
@@ -52,6 +53,7 @@ function CashRegister() {
   const [openingAmount, setOpeningAmount] = useState('')
   const [openingNotes, setOpeningNotes] = useState('')
   const [movementType, setMovementType] = useState('expense')
+  const [movementCategory, setMovementCategory] = useState('hielo')
   const [movementAmount, setMovementAmount] = useState('')
   const [movementDescription, setMovementDescription] = useState('')
   const [countedAmount, setCountedAmount] = useState('')
@@ -178,6 +180,7 @@ function CashRegister() {
     const { error: movementError } = await supabase.from('cash_movements').insert({
       session_id: session.id,
       type: movementType,
+      category: movementType === 'expense' ? movementCategory : null,
       amount,
       description: movementDescription.trim() || null,
     })
@@ -296,6 +299,7 @@ function CashRegister() {
           {movements.some((movement) => movement.type === 'income') && <div className="alert cash-info" role="status">Hay ingresos manuales antiguos. No se suman al efectivo esperado; si corresponden a un pedido, elimínalos.</div>}
           <form className="cash-form" onSubmit={addMovement}>
             <label>Tipo<select value={movementType} onChange={(event) => setMovementType(event.target.value)}>{MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            {movementType === 'expense' && <label>Categoría del gasto<select value={movementCategory} onChange={(event) => setMovementCategory(event.target.value)}>{EXPENSE_CATEGORIES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
             <label>Monto<MoneyInput required value={movementAmount} onChange={setMovementAmount} placeholder="0" aria-label="Monto del movimiento" /></label>
             <label>Descripción<input value={movementDescription} onChange={(event) => setMovementDescription(event.target.value)} placeholder="Ej. compra de hielo" /></label>
             <button className="primary-button" disabled={working}>Agregar movimiento</button>
@@ -303,7 +307,7 @@ function CashRegister() {
           <div className="cash-movements">
             {movements.length ? movements.map((movement) => <div className="cash-movement" key={movement.id}>
               <span className={`cash-movement-type ${movement.type}`}>{CASH_MOVEMENT_LABELS[movement.type] || movement.type}</span>
-              <span>{movement.description || 'Sin descripción'}</span>
+              <span>{movement.description || 'Sin descripción'}{movement.category && <small className="cash-movement-category">{EXPENSE_CATEGORY_LABELS[movement.category] || movement.category}</small>}</span>
               <strong>{movement.type === 'income' ? '+' : '−'}{money.format(Number(movement.amount) || 0)}</strong>
               <button className="text-button" onClick={() => deleteMovement(movement)} disabled={working}>Eliminar</button>
             </div>) : <p className="muted cash-empty">Sin movimientos registrados.</p>}
