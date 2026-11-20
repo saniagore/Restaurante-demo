@@ -263,7 +263,7 @@ function InvoicesTab({ settings, refreshToken }) {
     <section className="panel billing-panel">
       <div className="panel-heading">
         <div><h2>Documentos emitidos</h2><p className="muted">Últimos 30 días. El consecutivo se asigna de forma atómica por prefijo.</p></div>
-        <span className="dish-count">{invoices.length} documentos</span>
+        <span className="dish-count">{invoices.length} {invoices.length === 1 ? 'documento' : 'documentos'}</span>
       </div>
       {loading ? <div className="empty-state">Cargando facturas...</div> : !invoices.length ? <div className="empty-state">Todavía no hay documentos emitidos.</div> : <div className="billing-table-wrap">
         <table className="billing-table">
@@ -290,7 +290,7 @@ function InvoicesTab({ settings, refreshToken }) {
     <section className="panel billing-panel">
       <div className="panel-heading">
         <div><h2>Pedidos completados por facturar</h2><p className="muted">Puedes emitir el documento al completar el pedido o hacerlo aquí.</p></div>
-        <span className="dish-count">{pendingOrders.length} pendientes</span>
+        <span className="dish-count">{pendingOrders.length} {pendingOrders.length === 1 ? 'pendiente' : 'pendientes'}</span>
       </div>
       {loading ? <div className="empty-state">Cargando pedidos...</div> : !pendingOrders.length ? <div className="empty-state">Todos los pedidos completados de los últimos 30 días tienen documento.</div> : <div className="billing-table-wrap">
         <table className="billing-table">

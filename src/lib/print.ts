@@ -263,7 +263,7 @@ export function buildInvoiceTicket(invoice: TicketInvoice, order: TicketOrder, b
       ['TOTAL', formatTicketMoney(invoice.total)],
     ],
     payments: summarizePaymentRows(order.order_payments ?? []),
-    footer: invoice.invoice_resolution ? `Autorización de numeración: ${invoice.invoice_resolution}` : '',
+    footer: '',
     legal: 'Documento generado por el sistema. La transmisión a la DIAN requiere proveedor tecnológico habilitado.',
   })
 }
