@@ -26,7 +26,6 @@ async function fetchCashSales(session) {
     .lte('changed_at', end)
 
   if (error) {
-    console.error('No se pudieron calcular las ventas de caja', error)
     return { cashTotal: 0, transferTotal: 0, cashCount: 0, transferCount: 0, error: true }
   }
 
@@ -72,7 +71,6 @@ function CashRegister() {
       .limit(1)
 
     if (openError) {
-      console.error('No se pudo cargar la caja', openError)
       setError('No se pudo cargar la caja.')
       setLoading(false)
       return
@@ -156,7 +154,6 @@ function CashRegister() {
       opening_notes: openingNotes.trim() || null,
     })
     if (openError) {
-      console.error('No se pudo abrir la caja', openError)
       setError('No se pudo abrir la caja. Puede que ya exista una caja abierta.')
     } else {
       setOpeningAmount('')
@@ -185,7 +182,6 @@ function CashRegister() {
       description: movementDescription.trim() || null,
     })
     if (movementError) {
-      console.error('No se pudo registrar el movimiento', movementError)
       setError('No se pudo registrar el movimiento.')
     } else {
       setMovementAmount('')
@@ -200,7 +196,6 @@ function CashRegister() {
     setWorking(true)
     const { error: deleteError } = await supabase.from('cash_movements').delete().eq('id', movement.id)
     if (deleteError) {
-      console.error('No se pudo eliminar el movimiento', deleteError)
       setError('No se pudo eliminar el movimiento.')
     } else {
       await load()
@@ -224,7 +219,6 @@ function CashRegister() {
       supabase.from('cash_movements').select('*').eq('session_id', session.id).order('created_at'),
     ])
     if (latestSales.error || latestMovementsResult.error) {
-      console.error('No se pudo recalcular la caja', latestMovementsResult.error)
       setError('No se pudieron recalcular las ventas o movimientos; actualiza e intenta de nuevo.')
       setWorking(false)
       return
@@ -260,7 +254,6 @@ function CashRegister() {
       .single()
 
     if (closeError) {
-      console.error('No se pudo cerrar la caja', closeError)
       setError('No se pudo cerrar la caja. Actualiza e intenta de nuevo.')
     } else {
       setJustClosed(data)

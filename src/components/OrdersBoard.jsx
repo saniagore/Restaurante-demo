@@ -44,8 +44,7 @@ function OrdersBoard({ onOpenHistory }) {
 
   useEffect(() => {
     let mounted = true
-    supabase.from('restaurant_settings').select('*').eq('id', true).maybeSingle().then(({ data, error: settingsError }) => {
-      if (settingsError) console.error('No se pudo cargar la configuración fiscal', settingsError)
+    supabase.from('restaurant_settings').select('*').eq('id', true).maybeSingle().then(({ data }) => {
       if (mounted) setSettings(data || {})
     })
     return () => { mounted = false }
@@ -76,12 +75,10 @@ function OrdersBoard({ onOpenHistory }) {
     setNotice('')
     const { error: updateError } = await supabase.from('orders').update({ status }).eq('id', order.id)
     if (updateError) {
-      console.error('No se pudo actualizar la orden', updateError)
       setError('No se pudo actualizar el pedido. Intenta de nuevo.')
     } else if (status === 'completed' && settings?.auto_invoice_on_complete) {
       const { error: invoiceError } = await supabase.rpc('create_invoice', { p_order_id: order.id })
       if (invoiceError) {
-        console.error('No se pudo emitir el documento automático', invoiceError)
         setNotice(`Pedido completado. No se pudo emitir el documento: ${paymentErrorMessage(invoiceError)}`)
       } else {
         setNotice('Pedido completado y documento equivalente POS emitido automáticamente.')
@@ -94,7 +91,6 @@ function OrdersBoard({ onOpenHistory }) {
     setUpdating(order.id)
     const { error: updateError } = await supabase.from('orders').update({ payment_method }).eq('id', order.id)
     if (updateError) {
-      console.error('No se pudo actualizar el método de pago', updateError)
       setError('No se pudo actualizar el método de pago.')
     } else {
       setOrders((current) => current.map((item) => item.id === order.id ? { ...item, payment_method } : item))

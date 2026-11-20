@@ -86,7 +86,6 @@ function OrdersHistory() {
       .range(page * pageSize, page * pageSize + pageSize - 1)
 
     if (queryError) {
-      console.error('No se pudo cargar el historial', queryError)
       setError('No se pudo cargar el historial. Revisa los filtros e intenta de nuevo.')
       setOrders([])
       setTotal(0)

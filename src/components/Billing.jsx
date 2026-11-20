@@ -25,13 +25,6 @@ import PrintDialog from './PrintDialog'
 
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
 const formatDate = (value) => value ? new Date(value).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : '—'
-const SUPABASE_HOST = (() => {
-  try {
-    return new URL(import.meta.env.VITE_SUPABASE_URL || '').host || 'sin configurar'
-  } catch {
-    return 'sin configurar'
-  }
-})()
 const sum = (items, selector) => items.reduce((total, item) => total + (Number(selector(item)) || 0), 0)
 const lastDaysIso = (days) => {
   const date = new Date()
@@ -57,7 +50,6 @@ function Billing({ onOpenCash }) {
   const loadSettings = useCallback(async () => {
     const { data, error } = await supabase.from('restaurant_settings').select('*').eq('id', true).maybeSingle()
     if (error) {
-      console.error('No se pudo cargar la configuración fiscal', error)
       setSettingsError(isMissingSchemaError(error) ? MIGRATION_HINT : 'No se pudo cargar la configuración fiscal.')
     } else if (data) {
       setSettings({ ...DEFAULT_FISCAL_SETTINGS, ...data })
@@ -113,7 +105,6 @@ function InvoicesTab({ settings, refreshToken }) {
   const [notice, setNotice] = useState('')
   const [issuing, setIssuing] = useState(null)
   const [modalError, setModalError] = useState('')
-  const [modalDetail, setModalDetail] = useState(null)
   const [print, setPrint] = useState(null)
   const [working, setWorking] = useState(false)
 
@@ -138,14 +129,12 @@ function InvoicesTab({ settings, refreshToken }) {
     ])
 
     if (invoiceResult.error) {
-      console.error('No se pudieron cargar las facturas', invoiceResult.error)
       setError(isMissingSchemaError(invoiceResult.error) ? MIGRATION_HINT : 'No se pudieron cargar las facturas.')
       setInvoices([])
     } else {
       setInvoices(invoiceResult.data || [])
     }
     if (orderResult.error) {
-      console.error('No se pudieron cargar los pedidos facturables', orderResult.error)
       setCompletedOrders([])
     } else {
       setCompletedOrders(orderResult.data || [])
@@ -172,7 +161,6 @@ function InvoicesTab({ settings, refreshToken }) {
     event.preventDefault()
     if (!issuing) return
     setModalError('')
-    setModalDetail(null)
     setWorking(true)
     const { data, error: rpcError } = await supabase.rpc('create_invoice', {
       p_order_id: issuing.order.id,
@@ -183,14 +171,7 @@ function InvoicesTab({ settings, refreshToken }) {
       p_notes: issuing.notes || null,
     })
     if (rpcError) {
-      console.error('No se pudo emitir la factura', rpcError)
       setModalError(paymentErrorMessage(rpcError))
-      setModalDetail({
-        code: rpcError.code || 'sin código',
-        message: rpcError.message || 'Sin mensaje del servidor',
-        details: rpcError.details || '',
-        hint: rpcError.hint || '',
-      })
       setWorking(false)
       return
     }
@@ -204,7 +185,6 @@ function InvoicesTab({ settings, refreshToken }) {
 
   function openIssueModal(order) {
     setModalError('')
-    setModalDetail(null)
     setNotice('')
     setIssuing({
       order,
@@ -227,7 +207,6 @@ function InvoicesTab({ settings, refreshToken }) {
       voided_at: new Date().toISOString(),
     }).eq('id', invoice.id)
     if (voidError) {
-      console.error('No se pudo anular la factura', voidError)
       setError(paymentErrorMessage(voidError))
     } else {
       setNotice('Documento anulado. El consecutivo no se reutiliza.')
@@ -248,12 +227,10 @@ function InvoicesTab({ settings, refreshToken }) {
       link.download = `${formatInvoiceNumber(invoice.prefix, invoice.number)}.json`
       link.click()
       URL.revokeObjectURL(url)
-      const { error: updateError } = await supabase.from('invoices').update({ dian_status: 'exported' }).eq('id', invoice.id)
-      if (updateError) console.error('No se pudo marcar la factura como exportada', updateError)
+      await supabase.from('invoices').update({ dian_status: 'exported' }).eq('id', invoice.id)
       setNotice('JSON exportado. Envíalo a tu proveedor tecnológico para la transmisión fiscal.')
       await load()
-    } catch (exportError) {
-      console.error('No se pudo exportar la factura', exportError)
+    } catch {
       setError('No se pudo generar el archivo de exportación.')
     }
     setWorking(false)
@@ -262,10 +239,6 @@ function InvoicesTab({ settings, refreshToken }) {
   const preview = issuing ? calculateInvoiceAmounts(issuing.order.total, rate) : null
 
   return <>
-    <div className="alert billing-info" role="note">
-      <span>Este módulo emite el documento equivalente POS y exporta el JSON para tu proveedor. La transmisión a la DIAN no está incluida: requiere proveedor habilitado y resolución propia.</span>
-    </div>
-
     {error && <div className="alert" role="alert">{error}<button aria-label="Cerrar alerta" onClick={() => setError('')}>×</button></div>}
     {notice && <div className="alert billing-success" role="status">{notice}<button aria-label="Cerrar aviso" onClick={() => setNotice('')}>×</button></div>}
 
@@ -342,15 +315,7 @@ function InvoicesTab({ settings, refreshToken }) {
             <div><span>Impuesto ({taxRatePercent(rate)})</span><strong>{money.format(preview.tax)}</strong></div>
             <div><span>Total</span><strong>{money.format(preview.total)}</strong></div>
           </div>
-          {modalError && <div className="alert billing-form-wide" role="alert">{modalError}<button type="button" aria-label="Cerrar alerta" onClick={() => { setModalError(''); setModalDetail(null) }}>×</button></div>}
-          {modalDetail && <details className="billing-error-detail billing-form-wide">
-            <summary>Detalle técnico del error</summary>
-            <code>{modalDetail.code}: {modalDetail.message}</code>
-            {modalDetail.details && <code>{modalDetail.details}</code>}
-            {modalDetail.hint && <code>Hint: {modalDetail.hint}</code>}
-            <small>Proyecto Supabase: {SUPABASE_HOST}</small>
-            <small>Si la migración ya está aplicada, ejecuta en el SQL Editor: <code>notify pgrst, &apos;reload schema&apos;;</code></small>
-          </details>}
+          {modalError && <div className="alert billing-form-wide" role="alert">{modalError}<button type="button" aria-label="Cerrar alerta" onClick={() => setModalError('')}>×</button></div>}
           <footer className="billing-modal-actions billing-form-wide">
             <button type="button" className="secondary-button" onClick={() => setIssuing(null)}>Cancelar</button>
             <button className="primary-button" disabled={working}>{working ? 'Emitiendo...' : modalError ? 'Reintentar emisión' : 'Emitir e imprimir'}</button>
@@ -384,7 +349,6 @@ function ReceivablesTab({ settings, refreshToken }) {
       .order('created_at', { ascending: true })
       .limit(300)
     if (queryError) {
-      console.error('No se pudieron cargar las cuentas por cobrar', queryError)
       setError(isMissingSchemaError(queryError) ? MIGRATION_HINT : 'No se pudieron cargar los cobros y la cartera.')
       setOrders([])
     } else {
@@ -510,13 +474,11 @@ function ExpensesTab({ refreshToken, onOpenCash }) {
       supabase.from('cash_movements').select('*').gte('created_at', startIso).lt('created_at', endIso).order('created_at', { ascending: false }),
     ])
     if (sessionResult.error) {
-      console.error('No se pudo consultar la caja abierta', sessionResult.error)
       setSession(null)
     } else {
       setSession(sessionResult.data?.[0] || null)
     }
     if (movementResult.error) {
-      console.error('No se pudieron cargar los gastos', movementResult.error)
       setError(isMissingSchemaError(movementResult.error) ? MIGRATION_HINT : 'No se pudieron cargar los gastos del día.')
       setMovements([])
     } else {
@@ -558,7 +520,6 @@ function ExpensesTab({ refreshToken, onOpenCash }) {
       description: description.trim() || EXPENSE_CATEGORY_LABELS[category],
     })
     if (insertError) {
-      console.error('No se pudo registrar el gasto', insertError)
       setError(isMissingSchemaError(insertError) ? MIGRATION_HINT : 'No se pudo registrar el gasto.')
     } else {
       setNotice('Gasto registrado y descontado del efectivo esperado.')
@@ -574,7 +535,6 @@ function ExpensesTab({ refreshToken, onOpenCash }) {
     setWorking(true)
     const { error: deleteError } = await supabase.from('cash_movements').delete().eq('id', movement.id)
     if (deleteError) {
-      console.error('No se pudo eliminar el gasto', deleteError)
       setError('No se pudo eliminar el gasto.')
     } else {
       await load()
@@ -686,7 +646,6 @@ function SettingsTab({ settings, onSaved }) {
       auto_invoice_on_complete: form.autoInvoice,
     }).eq('id', true)
     if (updateError) {
-      console.error('No se pudo guardar la configuración fiscal', updateError)
       setError(isMissingSchemaError(updateError) ? MIGRATION_HINT : 'No se pudo guardar la configuración fiscal.')
     } else {
       setNotice('Configuración fiscal guardada. Aplica a los próximos documentos.')

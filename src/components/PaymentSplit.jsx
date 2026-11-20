@@ -38,7 +38,6 @@ function PaymentSplit({ order, onChanged, compact = false }) {
       p_reference: reference.trim() || null,
     })
     if (rpcError) {
-      console.error('No se pudo registrar el pago', rpcError)
       setError(paymentErrorMessage(rpcError))
     } else {
       setNotice('Pago registrado.')
@@ -56,14 +55,12 @@ function PaymentSplit({ order, onChanged, compact = false }) {
     setError('')
     const { error: deleteError } = await supabase.from('order_payments').delete().eq('id', payment.id)
     if (deleteError) {
-      console.error('No se pudo eliminar el pago', deleteError)
       setError(paymentErrorMessage(deleteError))
     } else {
       const remaining = (order.order_payments ?? []).filter((item) => item.id !== payment.id)
       if (remaining.length > 0) {
         const allCash = remaining.every((item) => item.method === 'cash')
-        const { error: methodError } = await supabase.from('orders').update({ payment_method: allCash ? 'cash' : 'transfer' }).eq('id', order.id)
-        if (methodError) console.error('No se pudo recalcular el método de pago', methodError)
+        await supabase.from('orders').update({ payment_method: allCash ? 'cash' : 'transfer' }).eq('id', order.id)
       }
       setNotice('Pago eliminado.')
       await onChanged?.()
