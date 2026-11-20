@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { CASH_MOVEMENT_LABELS, calculateCashTotals, cashDifference, summarizeSales } from '../lib/cash'
+import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from '../lib/billing'
 import { MoneyInput } from './MoneyInput'
 
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
@@ -19,13 +20,12 @@ async function fetchCashSales(session) {
   const end = session.closed_at || new Date().toISOString()
   const { data, error } = await supabase
     .from('order_status_history')
-    .select('order_id, changed_at, orders(total, payment_method)')
+    .select('order_id, changed_at, orders(total, payment_method, order_payments(method, amount))')
     .eq('to_status', 'completed')
     .gte('changed_at', session.opened_at)
     .lte('changed_at', end)
 
   if (error) {
-    console.error('No se pudieron calcular las ventas de caja', error)
     return { cashTotal: 0, transferTotal: 0, cashCount: 0, transferCount: 0, error: true }
   }
 
@@ -52,6 +52,7 @@ function CashRegister() {
   const [openingAmount, setOpeningAmount] = useState('')
   const [openingNotes, setOpeningNotes] = useState('')
   const [movementType, setMovementType] = useState('expense')
+  const [movementCategory, setMovementCategory] = useState('hielo')
   const [movementAmount, setMovementAmount] = useState('')
   const [movementDescription, setMovementDescription] = useState('')
   const [countedAmount, setCountedAmount] = useState('')
@@ -70,7 +71,6 @@ function CashRegister() {
       .limit(1)
 
     if (openError) {
-      console.error('No se pudo cargar la caja', openError)
       setError('No se pudo cargar la caja.')
       setLoading(false)
       return
@@ -154,7 +154,6 @@ function CashRegister() {
       opening_notes: openingNotes.trim() || null,
     })
     if (openError) {
-      console.error('No se pudo abrir la caja', openError)
       setError('No se pudo abrir la caja. Puede que ya exista una caja abierta.')
     } else {
       setOpeningAmount('')
@@ -178,11 +177,11 @@ function CashRegister() {
     const { error: movementError } = await supabase.from('cash_movements').insert({
       session_id: session.id,
       type: movementType,
+      category: movementType === 'expense' ? movementCategory : null,
       amount,
       description: movementDescription.trim() || null,
     })
     if (movementError) {
-      console.error('No se pudo registrar el movimiento', movementError)
       setError('No se pudo registrar el movimiento.')
     } else {
       setMovementAmount('')
@@ -197,7 +196,6 @@ function CashRegister() {
     setWorking(true)
     const { error: deleteError } = await supabase.from('cash_movements').delete().eq('id', movement.id)
     if (deleteError) {
-      console.error('No se pudo eliminar el movimiento', deleteError)
       setError('No se pudo eliminar el movimiento.')
     } else {
       await load()
@@ -221,7 +219,6 @@ function CashRegister() {
       supabase.from('cash_movements').select('*').eq('session_id', session.id).order('created_at'),
     ])
     if (latestSales.error || latestMovementsResult.error) {
-      console.error('No se pudo recalcular la caja', latestMovementsResult.error)
       setError('No se pudieron recalcular las ventas o movimientos; actualiza e intenta de nuevo.')
       setWorking(false)
       return
@@ -257,7 +254,6 @@ function CashRegister() {
       .single()
 
     if (closeError) {
-      console.error('No se pudo cerrar la caja', closeError)
       setError('No se pudo cerrar la caja. Actualiza e intenta de nuevo.')
     } else {
       setJustClosed(data)
@@ -296,6 +292,7 @@ function CashRegister() {
           {movements.some((movement) => movement.type === 'income') && <div className="alert cash-info" role="status">Hay ingresos manuales antiguos. No se suman al efectivo esperado; si corresponden a un pedido, elimínalos.</div>}
           <form className="cash-form" onSubmit={addMovement}>
             <label>Tipo<select value={movementType} onChange={(event) => setMovementType(event.target.value)}>{MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            {movementType === 'expense' && <label>Categoría del gasto<select value={movementCategory} onChange={(event) => setMovementCategory(event.target.value)}>{EXPENSE_CATEGORIES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
             <label>Monto<MoneyInput required value={movementAmount} onChange={setMovementAmount} placeholder="0" aria-label="Monto del movimiento" /></label>
             <label>Descripción<input value={movementDescription} onChange={(event) => setMovementDescription(event.target.value)} placeholder="Ej. compra de hielo" /></label>
             <button className="primary-button" disabled={working}>Agregar movimiento</button>
@@ -303,7 +300,7 @@ function CashRegister() {
           <div className="cash-movements">
             {movements.length ? movements.map((movement) => <div className="cash-movement" key={movement.id}>
               <span className={`cash-movement-type ${movement.type}`}>{CASH_MOVEMENT_LABELS[movement.type] || movement.type}</span>
-              <span>{movement.description || 'Sin descripción'}</span>
+              <span>{movement.description || 'Sin descripción'}{movement.category && <small className="cash-movement-category">{EXPENSE_CATEGORY_LABELS[movement.category] || movement.category}</small>}</span>
               <strong>{movement.type === 'income' ? '+' : '−'}{money.format(Number(movement.amount) || 0)}</strong>
               <button className="text-button" onClick={() => deleteMovement(movement)} disabled={working}>Eliminar</button>
             </div>) : <p className="muted cash-empty">Sin movimientos registrados.</p>}
@@ -343,10 +340,11 @@ function CashRegister() {
       <section className="panel cash-open">
         <div className="panel-heading"><div><h2>Abrir caja</h2><p className="muted">Registra la base inicial del turno.</p></div></div>
         <form className="cash-form cash-open-form" onSubmit={openCash}>
-          <label>Base inicial<MoneyInput required value={openingAmount} onChange={setOpeningAmount} placeholder="0" aria-label="Base inicial" /><small className="cash-hint">Solo números: puedes escribir 150000 o 150.000.</small></label>
+          <label>Base inicial<MoneyInput required value={openingAmount} onChange={setOpeningAmount} placeholder="0" aria-label="Base inicial" /></label>
           <label>Notas de apertura<input value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} placeholder="Ej. turno de la mañana" /></label>
           <button className="primary-button" disabled={working}>Abrir caja</button>
         </form>
+        <p className="cash-hint cash-open-hint">Solo números: puedes escribir 150000 o 150.000.</p>
       </section>
     </>}
 

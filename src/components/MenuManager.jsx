@@ -58,7 +58,6 @@ function MenuManager() {
     supabase.from('categories').select('id,nombre,orden').order('orden').then(({ data, error: categoryError }) => {
       if (!active) return
       if (categoryError) {
-        console.error('No se pudieron cargar las categorías', categoryError)
         setError('No se pudieron cargar las categorías. Revisa que la migración esté aplicada.')
       } else {
         setCategories(sortCategories(data || []))
@@ -188,7 +187,6 @@ function MenuManager() {
         .from('dish-images')
         .upload(uploadedPath, imageFile, { cacheControl: '31536000', contentType: imageFile.type, upsert: false })
       if (uploadError) {
-        console.error('No se pudo subir la imagen', uploadError)
         setError('No se pudo subir la imagen. Revisa que el bucket dish-images esté creado.')
         setSaving(false)
         return
@@ -210,7 +208,6 @@ function MenuManager() {
       : await supabase.from('dishes').insert(payload).select().single()
     if (response.error) {
       if (uploadedPath) await supabase.storage.from('dish-images').remove([uploadedPath])
-      console.error('No se pudo guardar el plato', response.error)
       setError('No se pudo guardar el plato. Intenta de nuevo.')
     } else {
       setDishes((current) => editingId ? current.map((dish) => dish.id === editingId ? response.data : dish) : [...current, response.data])
@@ -222,7 +219,6 @@ function MenuManager() {
   async function toggleAvailability(dish) {
     const { data, error: updateError } = await supabase.from('dishes').update({ is_available: !dish.is_available }).eq('id', dish.id).select().single()
     if (updateError) {
-      console.error('No se pudo cambiar la disponibilidad', updateError)
       setError('No se pudo cambiar la disponibilidad.')
     } else {
       setDishes((current) => current.map((item) => item.id === dish.id ? data : item))
@@ -236,7 +232,6 @@ function MenuManager() {
     setFeeSaved(false)
     const { error: feeError } = await supabase.from('restaurant_settings').update({ delivery_fee: Number(deliveryFee) }).eq('id', true)
     if (feeError) {
-      console.error('No se pudo guardar la tarifa', feeError)
       setError('No se pudo guardar la tarifa de domicilio.')
     } else {
       setFeeSaved(true)
@@ -256,7 +251,6 @@ function MenuManager() {
     const orden = categories.length ? Math.max(...categories.map((category) => Number(category.orden) || 0)) + 10 : 10
     const { data, error: createError } = await supabase.from('categories').insert({ nombre, orden }).select().single()
     if (createError) {
-      console.error('No se pudo crear la categoría', createError)
       setError('No se pudo crear la categoría. Intenta de nuevo.')
       return
     }
@@ -280,7 +274,6 @@ function MenuManager() {
     }
     const { data, error: updateError } = await supabase.from('categories').update({ nombre }).eq('id', editingCategoryId).select().single()
     if (updateError) {
-      console.error('No se pudo renombrar la categoría', updateError)
       setError('No se pudo renombrar la categoría.')
       return
     }
@@ -295,7 +288,6 @@ function MenuManager() {
     ))
     const updateError = results.find((result) => result.error)?.error
     if (updateError) {
-      console.error('No se pudo reordenar las categorías', updateError)
       setError('No se pudo reordenar las categorías.')
       return
     }
@@ -367,7 +359,6 @@ function MenuManager() {
     if (!window.confirm(message)) return
     const { error: deleteError } = await supabase.from('categories').delete().eq('id', category.id)
     if (deleteError) {
-      console.error('No se pudo eliminar la categoría', deleteError)
       setError('No se pudo eliminar la categoría.')
       return
     }

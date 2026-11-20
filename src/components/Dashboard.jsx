@@ -20,7 +20,7 @@ function Dashboard({ onOpenOrders }) {
       .from('orders')
       .select('id,status,customer_name,order_type,total,created_at')
       .order('created_at', { ascending: false })
-    if (queryError) { console.error('No se pudo cargar el resumen', queryError); setError('No se pudo cargar el resumen. Intenta de nuevo.') }
+    if (queryError) { setError('No se pudo cargar el resumen. Intenta de nuevo.') }
     else setOrders(uniqueOrders(data || []))
     setLoading(false)
   }, [])
@@ -45,7 +45,6 @@ function Dashboard({ onOpenOrders }) {
     setCancellingId(order.id)
     const { error: cancelError } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id)
     if (cancelError) {
-      console.error('No se pudo cancelar el pedido', cancelError)
       setError('No se pudo cancelar el pedido. Intenta de nuevo.')
     } else {
       setOrders((current) => current.map((item) => item.id === order.id ? { ...item, status: 'cancelled' } : item))

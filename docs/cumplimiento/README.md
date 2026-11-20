@@ -26,6 +26,7 @@ Esta guía explica qué se implementó, qué datos faltan por completar y cómo 
 | Imágenes de platos | `src/components/MenuManager.jsx`, `supabase/migrations/20261116050000_create_dish_images_bucket.sql` | El admin sube la imagen desde el formulario a Supabase Storage; ya no necesita pegar una URL. |
 | Flujo de caja | `src/components/CashRegister.jsx`, `supabase/migrations/20261117000000_cash_register.sql`, `20261117020000_cash_transfers.sql` | Apertura, ventas en efectivo y transferencia, ingresos, gastos, retiros y cierre con diferencia. |
 | Estadísticas de productos | `src/components/Statistics.jsx`, `supabase/migrations/20261117010000_dish_costs_statistics.sql` | Ventas, unidades, costo, ganancia y margen por producto; ranking de más vendido y más rentable. |
+| Facturación y finanzas | `src/components/Billing.jsx`, `src/lib/billing.ts`, `src/lib/print.ts`, `supabase/migrations/20261118000000_billing_and_finance.sql` | Documento equivalente POS con consecutivo, impresión de comanda y tiquete en 58/80 mm, pagos mixtos, cuentas por cobrar y gastos operativos por categoría. |
 
 ## 2. Datos pendientes (marcadores en mayúsculas)
 
@@ -77,7 +78,7 @@ npx supabase db push
 
 Alternativa: copiar el contenido de cada archivo en el SQL Editor del panel de Supabase, respetando el orden.
 
-**Atajo:** [migraciones-completas.sql](migraciones-completas.sql) reúne en un solo archivo el esquema base mínimo, las 11 migraciones anteriores y estas 10, en orden y de forma idempotente. Es la opción recomendada si prefieres pegar una sola vez en el SQL Editor.
+**Atajo:** [migraciones-completas.sql](migraciones-completas.sql) reúne en un solo archivo el esquema base mínimo, las 11 migraciones anteriores y estas 11, en orden y de forma idempotente. Es la opción recomendada si prefieres pegar una sola vez en el SQL Editor.
 
 1. `20261115000000_order_consent.sql`: agrega columnas y actualiza `create_order_secure`.
 2. `20261115010000_data_retention.sql`: agrega `anonymized_at`, crea las funciones de limpieza y programa `pg_cron`.
@@ -89,6 +90,7 @@ Alternativa: copiar el contenido de cada archivo en el SQL Editor del panel de S
 8. `20261117000000_cash_register.sql`: crea las sesiones y movimientos de caja con acceso solo para admin.
 9. `20261117010000_dish_costs_statistics.sql`: agrega `dishes.costo`, guarda `order_items.unit_cost` y rellena los ítems existentes.
 10. `20261117020000_cash_transfers.sql`: separa ventas en efectivo y transferencia en las sesiones de caja y restringe el método de pago.
+11. `20261118000000_billing_and_finance.sql`: configuración fiscal, facturas con consecutivo atómico, pagos mixtos por pedido, cartera y categorías de gasto en caja.
 
 Notas:
 
@@ -100,6 +102,11 @@ Notas:
 - Las **transferencias** se toman de los pedidos marcados con método de pago “Transferencia” en Órdenes. La caja permite alternar entre Total, Efectivo y Transferencias; el cierre físico siempre usa solo el efectivo.
 - **No registres pagos de pedidos como ingresos manuales**: si un cliente paga por Nequi, marca su pedido como Transferencia. La caja ya suma esa venta una sola vez y no la incluye en el efectivo esperado.
 - Las **estadísticas** usan los pedidos completados y el costo guardado en cada ítem. Si un plato no tiene costo, su ganancia se muestra como ingreso y el panel avisa cuáles completar.
+- **Facturación:** el panel emite el **documento equivalente POS** (base, impuesto incluido y total), asigna un consecutivo atómico por prefijo y exporta el JSON para un proveedor tecnológico. La **transmisión a la DIAN no está implementada**: requiere proveedor habilitado, certificado digital, resolución y numeración autorizada. Si cambias de país, el mismo esquema sirve para el documento fiscal local.
+- Si el panel dice que falta la migración de facturación pero ya la aplicaste, ejecuta `notify pgrst, 'reload schema';` en el SQL Editor: PostgREST puede conservar la caché anterior y responder `PGRST202` (función no encontrada). El modal de emisión muestra el código y el mensaje reales bajo “Detalle técnico del error”.
+- **Pagos mixtos:** un pedido puede cobrarse con efectivo, Nequi, Daviplata, tarjeta y transferencia. Cada pago se guarda en `order_payments` y la caja divide la venta por medio; si no hay pagos registrados se conserva el método histórico (`payment_method`). Los pagos parciales aparecen en **Cobros y cartera** hasta completar el saldo.
+- **Gastos operativos:** se registran desde Caja o desde **Gastos del día** con categoría (hielo, insumos, propinas, servicios, transporte, mantenimiento u otros). Solo los `expense` cuentan como gasto; los retiros no. Todos descuentan el efectivo esperado del cierre.
+- **Impresión:** comanda de cocina sin precios, cuenta del cliente y documento fiscal se generan en 58 o 80 mm y se imprimen en un iframe oculto, sin abrir pestañas nuevas.
 - El pedido se rechaza con el código `22023` si no incluye teléfono válido, versión legal vigente, más de 50 ítems, platos duplicados o cantidades fuera de 1-99.
 - Si el teléfono o el navegador ya tienen un pedido activo, la RPC responde `Ya tienes un pedido activo` (código `P0001`) y no crea una fila.
 - El mismo `client_token` devuelve el pedido ya creado: reintentar no duplica.
@@ -193,15 +200,15 @@ La anonimización solo toca pedidos `completed` o `cancelled`; un pedido en curs
 - **Consentimiento específico de datos sensibles:** la Política indica que escribir alergias constituye autorización expresa y que es opcional. Si el abogado lo exige, agrega una segunda casilla independiente en el checkout.
 - **Régimen tributario:** los textos declaran precios finales al consumidor con "todos los impuestos y costos aplicables", sin especificar INC ni IVA. Si el contador confirma el INC del 8 %, actualiza `priceNotice` en `src/config/business.ts` para nombrarlo.
 - **Registro Nacional de Bases de Datos (RNBD):** aplica a responsables con activos superiores a 100.000 UVT; verifica si tu caso está obligado.
-- **Facturación electrónica:** fuera de alcance.
-- **Datos legales editables desde `/admin`:** hoy viven en el código. La tabla `restaurant_settings` ya existe y podría almacenarlos para editarlos sin despliegue.
+- **Facturación electrónica:** el panel emite el documento equivalente POS y exporta el JSON para el proveedor, pero no transmite a la DIAN. Falta contratar un proveedor tecnológico habilitado, cargar certificado y resolución, y definir la numeración autorizada.
+- **Datos legales editables desde `/admin`:** los datos fiscales del emisor ya se editan en Facturación → Configuración fiscal. Los datos de las páginas legales (`src/config/business.ts`) siguen en el código.
 
 ## 9. Checklist antes de publicar
 
 - [ ] Completar los datos de la sección 2 y actualizar `LEGAL_VERSION` si cambia el texto.
 - [ ] Revisión de los cuatro documentos por un abogado.
 - [ ] Revisión de precios e impuestos por el contador (hoy se declaran como precios finales con impuestos incluidos).
-- [ ] Aplicar las cuatro migraciones (o el archivo único) y ejecutar la verificación de la sección 5.
+- [ ] Aplicar todas las migraciones (o el archivo único) y ejecutar la verificación de la sección 5.
 - [ ] Probar que un segundo pedido con el mismo teléfono o navegador se rechace y que cancelar lo libere.
 - [ ] Probar un pedido para recoger de punta a punta: debe poder pasar de Preparando a Completadas y el cliente debe ver "Listo para recoger".
 - [ ] Crear una categoría, mover un plato y comprobar el filtro en el menú público.
@@ -209,6 +216,9 @@ La anonimización solo toca pedidos `completed` o `cancelled`; un pedido en curs
 - [ ] Abrir caja, registrar un gasto, completar un pedido y cerrar la caja verificando el efectivo esperado.
 - [ ] Marcar un pedido como transferencia y comprobar el cambio Total / Efectivo / Transferencias en Caja.
 - [ ] Cargar el costo de los platos y revisar el ranking de ganancia en Estadísticas.
+- [ ] Emitir un documento desde Facturación, imprimirlo en 58 y 80 mm y anularlo; verificar que el consecutivo no se repita.
+- [ ] Cobrar un pedido en efectivo y Nequi, comprobar el saldo en Cobros y cartera y que la caja divida la venta por medio.
+- [ ] Registrar un gasto con categoría en Gastos del día y confirmar que baja el efectivo esperado en el cierre.
 - [ ] Confirmar que los buzones `pqrsEmail` y `privacyEmail` existen y tienen responsable asignado.
 - [ ] Probar en producción: carrito → consentimiento sin marcar (debe bloquear) → pedido → seguimiento.
 - [ ] Verificar que la CSP no bloquee Supabase (REST, Realtime del panel) ni las imágenes del menú.

@@ -51,7 +51,6 @@ function Statistics({ onOpenMenu }) {
 
     const { data, error: queryError } = await query
     if (queryError) {
-      console.error('No se pudieron cargar las estadísticas', queryError)
       setError('No se pudieron cargar las estadísticas. Revisa que las migraciones estén aplicadas.')
       setOrders([])
     } else {
